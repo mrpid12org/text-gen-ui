@@ -1,11 +1,11 @@
 # Use the correct NVIDIA CUDA runtime image for your hardware
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
-# --- DOCKERFILE VERSION: TGW-v7-FINAL ---
+# --- DOCKERFILE VERSION: TGW-v9-LAYER-FIX ---
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# --- 1. Install System Dependencies (including git-lfs) ---
+# --- 1. Install System Dependencies ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     git-lfs \
@@ -18,29 +18,34 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# --- 2. Install text-generation-webui and its dependencies ---
-# Clone the repository and set the working directory
-RUN git clone https://github.com/oobabooga/text-generation-webui.git /app
+# --- 2. Clone Repository and Install Core Dependencies ---
+# Combine steps into a single layer to ensure correct path context.
+# This clones the repo, pulls LFS files, and installs requirements all at once.
+RUN git clone https://github.com/oobabooga/text-generation-webui.git /app \
+    && cd /app \
+    && git lfs install \
+    && git lfs pull \
+    && python3 -m pip install -r requirements.txt
+
+# Set the working directory for all subsequent commands
 WORKDIR /app
 
-# Initialize LFS and pull the large files to fix the missing requirements file
-RUN git lfs install && git lfs pull
-
-# Install all requirements from the main file first
-RUN python3 -m pip install -r requirements.txt
-
-# Install the correct stable PyTorch for CUDA 12.8
+# --- 3. Install PyTorch ---
 RUN python3 -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 
-# --- 3. Setup Persistence for Models ---
-# Create a symlink so models in /workspace/models are available inside the app
+# --- 4. Install Extensions ---
+# The WORKDIR is now /app, so we can use relative paths.
+RUN git clone https://github.com/DavG25/text-generation-webui-deep_reason.git extensions/text-generation-webui-deep_reason
+RUN python3 -m pip install -r extensions/text-generation-webui-deep_reason/requirements.txt
+
+# --- 5. Setup Persistence for Models ---
 RUN mkdir -p /workspace/models
 RUN rm -rf ./models && ln -s /workspace/models ./models
 
-# --- 4. Copy Startup Script ---
+# --- 6. Copy Startup Script ---
 COPY start.sh .
 RUN chmod +x start.sh
 
-# --- 5. Expose Port and Set Entrypoint ---
+# --- 7. Expose Port and Set Entrypoint ---
 EXPOSE 7860
 CMD ["/bin/bash", "start.sh"]
