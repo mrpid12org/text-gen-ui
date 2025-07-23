@@ -2,7 +2,7 @@
 FROM nvidia/cuda:12.8.1-runtime-ubuntu22.04
 
 # --- THIS IS THE VERSION IDENTIFIER ---
-RUN echo "--- DOCKERFILE VERSION: TGW-v4-PATH-FIX ---"
+RUN echo "--- DOCKERFILE VERSION: TGW-v5-PATH-FIX ---"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
