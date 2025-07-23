@@ -1,7 +1,7 @@
 # Use the correct NVIDIA CUDA runtime image for your hardware
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
-# --- DOCKERFILE VERSION: TGW-v18-STANDARD-CLONE-FIX ---
+# --- DOCKERFILE VERSION: TGW-v19-BUILD-FIX ---
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # --- 2. Clone Main Repo & Copy Local Extension ---
 WORKDIR /app
 
-# Prevent git from asking for credentials, which is the standard fix for this build error.
+# Prevent git from asking for credentials.
 ENV GIT_TERMINAL_PROMPT=0
 
 # Use the standard "git clone" method for the main repository.
@@ -32,8 +32,8 @@ RUN git clone https://github.com/oobabooga/text-generation-webui.git . \
 COPY deep_reason/ /app/extensions/deep_reason/
 
 # --- 3. Run the Automated Installer ---
-# This will install all dependencies for the web UI and any copied extensions.
-RUN GPU_CHOICE=A INSTALL_EXTENSIONS=TRUE ./start_linux.sh
+# Added LAUNCH_AFTER_INSTALL=FALSE to prevent the script from hanging the build.
+RUN GPU_CHOICE=A LAUNCH_AFTER_INSTALL=FALSE INSTALL_EXTENSIONS=TRUE ./start_linux.sh
 
 # --- 4. Configure Startup Flags ---
 # This creates the flag file to activate the extension on startup.
