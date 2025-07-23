@@ -1,7 +1,7 @@
 # Use the correct NVIDIA CUDA runtime image for your hardware
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
-# --- DOCKERFILE VERSION: TGW-v23-AUTO-DETECT ---
+# --- DOCKERFILE VERSION: TGW-v24-MULTIMODAL ---
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -30,17 +30,21 @@ RUN git clone https://github.com/oobabooga/text-generation-webui.git . \
     && git lfs pull
 COPY deep_reason/ /app/extensions/deep_reason/
 
-# --- 4. Run the Automated Installer ---
+# --- 4. (Optional) Install LLaVA or other multimodal support ---
+# Skipping broken LLaVA extension, but directory exists for later
+RUN mkdir -p /app/extensions/multimodal
+
+# --- 5. Run the Automated Installer ---
 RUN GPU_CHOICE=A LAUNCH_AFTER_INSTALL=FALSE INSTALL_EXTENSIONS=TRUE ./start_linux.sh
 
-# --- 5. Setup Persistence for Models ---
+# --- 6. Setup Persistence for Models ---
 RUN mkdir -p /workspace/models
 RUN rm -rf ./models && ln -s /workspace/models ./models
 
-# --- 6. Copy updated run.sh ---
+# --- 7. Copy updated run.sh ---
 COPY run.sh /app/run.sh
 RUN chmod +x /app/run.sh
 
-# --- 7. Expose Port and Set Entrypoint ---
+# --- 8. Expose Port and Set Entrypoint ---
 EXPOSE 7860
 CMD ["/bin/bash", "run.sh"]
