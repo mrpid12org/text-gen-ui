@@ -2,7 +2,7 @@
 FROM nvidia/cuda:12.8.1-runtime-ubuntu22.04
 
 # --- THIS IS THE VERSION IDENTIFIER ---
-RUN echo "--- DOCKOCKERFILE VERSION: TGW-v3-REQUIREMENTS-FIX ---"
+RUN echo "--- DOCKERFILE VERSION: TGW-v4-PATH-FIX ---"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -19,16 +19,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # --- 2. Install text-generation-webui and its dependencies ---
+# --- THIS IS THE FIX ---
+# Clone the repository directly into the /app directory
+RUN git clone https://github.com/oobabooga/text-generation-webui.git /app
+# Set the working directory to /app for all subsequent commands
 WORKDIR /app
-
-# Clone the repository
-RUN git clone https://github.com/oobabooga/text-generation-webui.git .
 
 # Install the correct stable PyTorch for CUDA 12.8
 RUN python3 -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 
-# --- THIS IS THE FIX ---
-# Install all requirements from the main file.
+# Install all requirements from the main file
 RUN python3 -m pip install -r requirements.txt
 
 # --- 3. Setup Persistence for Models ---
