@@ -1,7 +1,7 @@
 # Use the correct NVIDIA CUDA runtime image for your hardware
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
-# --- DOCKERFILE VERSION: TGW-v13-GIT-FIX ---
+# --- DOCKERFILE VERSION: TGW-v14-PROTOCOL-FIX ---
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -22,13 +22,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Prevent git from asking for credentials in the non-interactive docker environment.
-# THIS IS THE CRITICAL FIX FOR THE ERROR: "terminal prompts disabled"
 ENV GIT_TERMINAL_PROMPT=0
 
-# Consolidate git operations into a single layer for robustness.
-RUN git clone https://github.com/oobabooga/text-generation-webui.git . \
+# Consolidate git operations and switch to the git:// protocol to bypass HTTPS issues.
+RUN git clone git://github.com/oobabooga/text-generation-webui.git . \
     && git lfs pull \
-    && git clone https://github.com/DavG25/text-generation-webui-deep_reason.git extensions/text-generation-webui-deep_reason
+    && git clone git://github.com/DavG25/text-generation-webui-deep_reason.git extensions/text-generation-webui-deep_reason
 
 # --- 3. Run the Automated Installer ---
 RUN GPU_CHOICE=A INSTALL_EXTENSIONS=TRUE ./start_linux.sh
