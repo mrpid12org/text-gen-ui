@@ -1,7 +1,7 @@
 # Use the correct NVIDIA CUDA runtime image for your hardware
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
-# --- DOCKERFILE VERSION: TGW-v12-EXT-INSTALL-FIX ---
+# --- DOCKERFILE VERSION: TGW-v13-GIT-FIX ---
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -20,12 +20,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # --- 2. Clone Repositories ---
 WORKDIR /app
-RUN git clone https://github.com/oobabooga/text-generation-webui.git .
-RUN git lfs pull
-RUN git clone https://github.com/DavG25/text-generation-webui-deep_reason.git extensions/text-generation-webui-deep_reason
+
+# Prevent git from asking for credentials in the non-interactive docker environment. This is the key fix.
+ENV GIT_TERMINAL_PROMPT=0
+
+# Consolidate git operations into a single layer for robustness.
+RUN git clone https://github.com/oobabooga/text-generation-webui.git . \
+    && git lfs pull \
+    && git clone https://github.com/DavG25/text-generation-webui-deep_reason.git extensions/text-generation-webui-deep_reason
 
 # --- 3. Run the Automated Installer ---
-# Added INSTALL_EXTENSIONS=TRUE to ensure the extension's requirements are installed.
 RUN GPU_CHOICE=A INSTALL_EXTENSIONS=TRUE ./start_linux.sh
 
 # --- 4. Configure Startup Flags ---
