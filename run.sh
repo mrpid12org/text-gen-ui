@@ -1,10 +1,16 @@
 #!/bin/bash
-# TGW RUN.SH v23 - Auto-detect GGUF model, auto-download fallback, HF token support
+# TGW RUN.SH v24 - Multimodal + Auto-detect GGUF model, auto-download fallback, HF token support
 
 LOGFILE="/app/run.log"
 echo "----- Starting run.sh at $(date) -----" | tee $LOGFILE
 
 CMD_ARGS="--listen --extensions deep_reason,api"
+
+# Add multimodal extension only if enabled
+if [ "$ENABLE_MULTIMODAL" == "true" ]; then
+  echo "Multimodal extension enabled." | tee -a $LOGFILE
+  CMD_ARGS="${CMD_ARGS},multimodal"
+fi
 
 # Load environment variables
 # MODEL_NAME: specific model folder or filename (gguf)
