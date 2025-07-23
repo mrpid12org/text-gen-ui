@@ -2,7 +2,7 @@
 FROM nvidia/cuda:12.8.1-runtime-ubuntu22.04
 
 # --- THIS IS THE VERSION IDENTIFIER ---
-RUN echo "--- DOCKERFILE VERSION: TGW-v2-CUDA12.8-FIX ---"
+RUN echo "--- DOCKOCKERFILE VERSION: TGW-v3-REQUIREMENTS-FIX ---"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -24,12 +24,11 @@ WORKDIR /app
 # Clone the repository
 RUN git clone https://github.com/oobabooga/text-generation-webui.git .
 
-# --- THIS IS THE FIX ---
 # Install the correct stable PyTorch for CUDA 12.8
 RUN python3 -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 
-# Install the requirements for the exllama2 loader and the main application
-RUN python3 -m pip install -r requirements_exllama2.txt
+# --- THIS IS THE FIX ---
+# Install all requirements from the main file.
 RUN python3 -m pip install -r requirements.txt
 
 # --- 3. Setup Persistence for Models ---
