@@ -21,7 +21,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # --- 2. Clone Repositories ---
 WORKDIR /app
 
-# Prevent git from asking for credentials in the non-interactive docker environment. This is the key fix.
+# Prevent git from asking for credentials in the non-interactive docker environment.
+# THIS IS THE CRITICAL FIX FOR THE ERROR: "terminal prompts disabled"
 ENV GIT_TERMINAL_PROMPT=0
 
 # Consolidate git operations into a single layer for robustness.
