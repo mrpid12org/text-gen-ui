@@ -1,7 +1,7 @@
 # Use the correct NVIDIA CUDA runtime image for your hardware
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
-# --- DOCKERFILE VERSION: TGW-v24-MULTIMODAL ---
+# --- DOCKERFILE VERSION: TGW-v25-EXLLAMA2-FIX ---
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -30,21 +30,21 @@ RUN git clone https://github.com/oobabooga/text-generation-webui.git . \
     && git lfs pull
 COPY deep_reason/ /app/extensions/deep_reason/
 
-# --- 4. (Optional) Install LLaVA or other multimodal support ---
-# Skipping broken LLaVA extension, but directory exists for later
-RUN mkdir -p /app/extensions/multimodal
-
-# --- 5. Run the Automated Installer ---
+# --- 4. Run the Automated Installer ---
 RUN GPU_CHOICE=A LAUNCH_AFTER_INSTALL=FALSE INSTALL_EXTENSIONS=TRUE ./start_linux.sh
 
-# --- 6. Setup Persistence for Models ---
+# --- 4b. Patch ExLlama2 for CUDA 12.8 + Torch 2.7 ---
+RUN pip install --upgrade pip && \
+    pip install https://huggingface.co/Alissonerdx/exllamav2-0.2.7-cu12.8.0.torch2.7.0-cp311-cp311-linux_x86_64/resolve/main/exllamav2-0.2.7-cp311-cp311-linux_x86_64.whl
+
+# --- 5. Setup Persistence for Models ---
 RUN mkdir -p /workspace/models
 RUN rm -rf ./models && ln -s /workspace/models ./models
 
-# --- 7. Copy updated run.sh ---
+# --- 6. Copy updated run.sh ---
 COPY run.sh /app/run.sh
 RUN chmod +x /app/run.sh
 
-# --- 8. Expose Port and Set Entrypoint ---
+# --- 7. Expose Port and Set Entrypoint ---
 EXPOSE 7860
 CMD ["/bin/bash", "run.sh"]
