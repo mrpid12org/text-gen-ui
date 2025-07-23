@@ -1,21 +1,7 @@
-# --- STAGE 1: The Downloader ---
-# This stage uses a lightweight image to download the source as a ZIP file, bypassing git.
-FROM alpine:latest as downloader
-
-# Install wget and unzip
-RUN apk update && apk add --no-cache wget unzip
-
-# Download the source code and extract it
-WORKDIR /src
-RUN wget -O text-generation-webui.zip https://github.com/oobabooga/text-generation-webui/archive/refs/heads/main.zip
-RUN unzip text-generation-webui.zip && mv text-generation-webui-main /app_source
-
-
-# --- STAGE 2: The Final Image ---
-# Start building the main image from the correct CUDA base
+# Use the correct NVIDIA CUDA runtime image for your hardware
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
-# --- DOCKERFILE VERSION: TGW-v17-SIMPLIFIED-INSTALL ---
+# --- DOCKERFILE VERSION: TGW-v18-STANDARD-CLONE-FIX ---
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -32,18 +18,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# --- 2. Copy Source Code and Extensions ---
+# --- 2. Clone Main Repo & Copy Local Extension ---
 WORKDIR /app
 
-# Copy the pre-downloaded application source from the downloader stage
-COPY --from=downloader /app_source /app
+# Prevent git from asking for credentials, which is the standard fix for this build error.
+ENV GIT_TERMINAL_PROMPT=0
 
-# Copy your local, paid extension into the correct directory inside the image
+# Use the standard "git clone" method for the main repository.
+RUN git clone https://github.com/oobabooga/text-generation-webui.git . \
+    && git lfs pull
+
+# Copy your local, paid extension into the correct directory inside the image.
 COPY deep_reason/ /app/extensions/deep_reason/
 
 # --- 3. Run the Automated Installer ---
-# Simplified installer command. This sets up the main web UI environment.
-RUN GPU_CHOICE=A ./start_linux.sh
+# This will install all dependencies for the web UI and any copied extensions.
+RUN GPU_CHOICE=A INSTALL_EXTENSIONS=TRUE ./start_linux.sh
 
 # --- 4. Configure Startup Flags ---
 # This creates the flag file to activate the extension on startup.
