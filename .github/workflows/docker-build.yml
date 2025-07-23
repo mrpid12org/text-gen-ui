@@ -1,13 +1,18 @@
 name: Docker Build and Push
 
-# This workflow runs automatically on any push to the "main" branch
+# This section defines when the workflow runs
 on:
+  # This trigger runs the workflow on any push to the "main" branch
   push:
     branches: [ "main" ]
+  
+  # --- THIS IS THE FIX ---
+  # This trigger adds a button in the Actions tab to manually run the workflow
+  workflow_dispatch:
 
 jobs:
   build:
-    # This tells the job to run on your new self-hosted runner
+    # This tells the job to run on your self-hosted runner
     runs-on: self-hosted
 
     steps:
@@ -28,4 +33,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: sjpgwh/text-gen-ui:latest
+          tags: DOCKERHUB_USERNAME/YOUR_IMAGE_NAME:latest
