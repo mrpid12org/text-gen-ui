@@ -1,14 +1,14 @@
 # Use the correct NVIDIA CUDA runtime image for your hardware
-FROM nvidia/cuda:12.8.1-runtime-ubuntu22.04
+FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
-# --- THIS IS THE VERSION IDENTIFIER ---
-RUN echo "--- DOCKERFILE VERSION: TGW-v5-PATH-FIX ---"
+# --- DOCKERFILE VERSION: TGW-v7-FINAL ---
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# --- 1. Install System Dependencies ---
+# --- 1. Install System Dependencies (including git-lfs) ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
+    git-lfs \
     curl \
     build-essential \
     python3.11 \
@@ -19,17 +19,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # --- 2. Install text-generation-webui and its dependencies ---
-# --- THIS IS THE FIX ---
-# Clone the repository directly into the /app directory
+# Clone the repository and set the working directory
 RUN git clone https://github.com/oobabooga/text-generation-webui.git /app
-# Set the working directory to /app for all subsequent commands
 WORKDIR /app
+
+# Initialize LFS and pull the large files to fix the missing requirements file
+RUN git lfs install && git lfs pull
+
+# Install all requirements from the main file first
+RUN python3 -m pip install -r requirements.txt
 
 # Install the correct stable PyTorch for CUDA 12.8
 RUN python3 -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
-
-# Install all requirements from the main file
-RUN python3 -m pip install -r requirements.txt
 
 # --- 3. Setup Persistence for Models ---
 # Create a symlink so models in /workspace/models are available inside the app
