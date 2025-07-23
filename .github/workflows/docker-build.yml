@@ -33,4 +33,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: DOCKERHUB_USERNAME/YOUR_IMAGE_NAME:latest
+          tags: sjpgwh/text-gen-ui:latest
