@@ -1,13 +1,12 @@
 #!/bin/bash
-# TGW RUN.SH v36 - Final: Bypass launcher and run python directly.
+# TGW RUN.SH v37 - Correcting python path and removing venv activation.
 
 echo "----- Starting final run.sh at $(date) -----"
 
-# Activate the python virtual environment created by the installer
-source /app/installer_files/env/bin/activate
+# This script no longer activates a venv, as one is not created.
+# We will call the specific python version we installed in the Dockerfile.
 
 # Build the argument list directly for the python server
-# We are providing every necessary argument here.
 CMD_ARGS_ARRAY=()
 
 # Network settings
@@ -27,10 +26,10 @@ else
   exit 1
 fi
 
-echo "Activating venv and running python server.py with args: ${CMD_ARGS_ARRAY[@]}"
+echo "Running python3.12 server.py with args: ${CMD_ARGS_ARRAY[@]}"
 echo "---------------------------------"
 
 # --- Launch Server Directly ---
 # This bypasses start_linux.sh and gives us direct control.
 cd /app
-python server.py "${CMD_ARGS_ARRAY[@]}"
+python3.12 server.py "${CMD_ARGS_ARRAY[@]}"
