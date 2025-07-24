@@ -1,16 +1,16 @@
 #!/bin/bash
-# TGW RUN.SH v28.4 - Adds support for DEFAULT_MODEL_NAME env var + GGUF loader fix
+# TGW RUN.SH v29 - Direct Python launch to fix loops and networking.
 
 LOGFILE="/app/run.log"
-echo "----- Starting run.sh at $(date) -----" | tee $LOGFILE
+echo "----- Starting run.sh at $(date) -----"
 
-# Added --nowebui to respect listen flags
-CMD_ARGS="--nowebui --listen --listen-host 0.0.0.0 --listen-port 7860 --extensions deep_reason,api"
+# Added --nowebui to respect listen flags, which is critical.
+CMD_ARGS="--nowebui --listen --listen-host 0.0.0.0 --listen-port 7860 --extensions deep_reason api"
 
 # Optional multimodal extension
 if [ "$ENABLE_MULTIMODAL" == "true" ]; then
-  echo "Multimodal extension enabled." | tee -a $LOGFILE
-  CMD_ARGS="${CMD_ARGS},multimodal"
+  echo "Multimodal extension enabled."
+  CMD_ARGS="${CMD_ARGS} multimodal"
 fi
 
 # Function: Auto-discover GGUF model in /workspace/models (non-recursive)
@@ -39,17 +39,17 @@ find_gguf_model() {
 
 # Priority: MODEL_NAME > DEFAULT_MODEL_NAME > auto-detect > fallback
 if [ -n "$MODEL_NAME" ]; then
-  echo "Using MODEL_NAME from env: $MODEL_NAME" | tee -a $LOGFILE
+  echo "Using MODEL_NAME from env: $MODEL_NAME"
 elif [ -n "$DEFAULT_MODEL_NAME" ]; then
-  echo "Using DEFAULT_MODEL_NAME from env: $DEFAULT_MODEL_NAME" | tee -a $LOGFILE
+  echo "Using DEFAULT_MODEL_NAME from env: $DEFAULT_MODEL_NAME"
   MODEL_NAME="$DEFAULT_MODEL_NAME"
 else
   MODEL_PATH=$(find_gguf_model)
   if [ $? -eq 0 ]; then
     MODEL_NAME=$(basename "$MODEL_PATH")
-    echo "Auto-detected model: $MODEL_NAME" | tee -a $LOGFILE
+    echo "Auto-detected model: $MODEL_NAME"
   else
-    echo "No model specified and no local model found." | tee -a $LOGFILE
+    echo "No model specified and no local model found."
     MODEL_NAME=""
   fi
 fi
@@ -61,25 +61,25 @@ FALLBACK_HF_REPO="bartowski/mlabonne_gemma-3-27b-it-abliterated-GGUF"
 download_model() {
   local model_file="$1"
   local hf_repo="$2"
-  echo "Attempting to download $model_file from HF repo $hf_repo ..." | tee -a $LOGFILE
+  echo "Attempting to download $model_file from HF repo $hf_repo ..."
 
   if [ -n "$HF_TOKEN" ]; then
-    echo "Using huggingface-cli with HF_TOKEN" | tee -a $LOGFILE
-    huggingface-cli login --token "$HF_TOKEN" 2>>$LOGFILE
-    huggingface-cli repo download "$hf_repo" --filename "$model_file" --repo-type model -d /workspace/models 2>>$LOGFILE
+    echo "Using huggingface-cli with HF_TOKEN"
+    huggingface-cli login --token "$HF_TOKEN"
+    huggingface-cli repo download "$hf_repo" --filename "$model_file" --repo-type model -d /workspace/models
   else
-    echo "No HF_TOKEN set, using wget for direct download" | tee -a $LOGFILE
-    wget -c -O "/workspace/models/$model_file" "https://huggingface.co/$hf_repo/resolve/main/$model_file" 2>>$LOGFILE
+    echo "No HF_TOKEN set, using wget for direct download"
+    wget -c -O "/workspace/models/$model_file" "https://huggingface.co/$hf_repo/resolve/main/$model_file"
   fi
 }
 
 # Auto-download fallback if enabled and nothing was selected
 if [ -z "$MODEL_NAME" ] && [ "$AUTO_DOWNLOAD" == "true" ]; then
   if [ ! -f "/workspace/models/$FALLBACK_MODEL" ]; then
-    echo "Downloading fallback model..." | tee -a $LOGFILE
+    echo "Downloading fallback model..."
     download_model "$FALLBACK_MODEL" "$FALLBACK_HF_REPO"
   else
-    echo "Fallback model already exists locally." | tee -a $LOGFILE
+    echo "Fallback model already exists locally."
   fi
   MODEL_NAME="$FALLBACK_MODEL"
 fi
@@ -87,14 +87,14 @@ fi
 # Final check before launch
 if [ -n "$MODEL_NAME" ]; then
   CMD_ARGS+=" --model $MODEL_NAME"
-  CMD_ARGS+=" --model-dir /workspace/models"  # Critical for GGUF
+  CMD_ARGS+=" --model-dir /workspace/models"
 
   # GGUF loader (llama.cpp)
   if [[ "$MODEL_NAME" == *.gguf ]]; then
     CMD_ARGS+=" --loader llama.cpp"
   fi
 else
-  echo "No model to load, exiting." | tee -a $LOGFILE
+  echo "No model to load, exiting."
   exit 1
 fi
 
@@ -103,8 +103,10 @@ if [ -n "$NUM_EXPERTS_PER_TOKEN" ]; then
   CMD_ARGS+=" --num_experts_per_token $NUM_EXPERTS_PER_TOKEN"
 fi
 
-echo "Final launch command args: $CMD_ARGS" | tee -a $LOGFILE
-echo "---------------------------------" | tee -a $LOGFILE
+echo "Final launch command args: python3.12 server.py $CMD_ARGS"
+echo "---------------------------------"
 
-# Launch server
-exec ./start_linux.sh $CMD_ARGS 2>&1 | tee -a $LOGFILE
+# Launch server directly with python to keep it in the foreground
+# This is the key fix for the restart loop and networking issues.
+cd /app
+python3.12 server.py $CMD_ARGS
