@@ -1,25 +1,36 @@
 #!/bin/bash
-# TGW RUN.SH v35 - Re-adding the --model-dir argument
+# TGW RUN.SH v36 - Final: Bypass launcher and run python directly.
 
-echo "----- Starting simplified run.sh at $(date) -----"
+echo "----- Starting final run.sh at $(date) -----"
 
-# We will pass the essential model arguments, including the model directory.
+# Activate the python virtual environment created by the installer
+source /app/installer_files/env/bin/activate
+
+# Build the argument list directly for the python server
+# We are providing every necessary argument here.
 CMD_ARGS_ARRAY=()
 
+# Network settings
+CMD_ARGS_ARRAY+=(--host)
+CMD_ARGS_ARRAY+=(0.0.0.0)
+CMD_ARGS_ARRAY+=(--port)
+CMD_ARGS_ARRAY+=(7860)
+
+# Model settings
 if [ -n "$MODEL_NAME" ]; then
   echo "Using model from environment variable: $MODEL_NAME"
   CMD_ARGS_ARRAY+=(--model "$MODEL_NAME")
-  CMD_ARGS_ARRAY+=(--model-dir /workspace/models) # This line fixes the error
+  CMD_ARGS_ARRAY+=(--model-dir /workspace/models)
   CMD_ARGS_ARRAY+=(--loader llama.cpp)
 else
   echo "ERROR: No MODEL_NAME environment variable set."
   exit 1
 fi
 
-echo "Passing arguments to launcher: ${CMD_ARGS_ARRAY[@]}"
+echo "Activating venv and running python server.py with args: ${CMD_ARGS_ARRAY[@]}"
 echo "---------------------------------"
 
-# --- Launch Server ---
-# The launcher will read CMD_FLAGS.txt for the network settings.
+# --- Launch Server Directly ---
+# This bypasses start_linux.sh and gives us direct control.
 cd /app
-./start_linux.sh "${CMD_ARGS_ARRAY[@]}"
+python server.py "${CMD_ARGS_ARRAY[@]}"
