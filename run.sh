@@ -1,47 +1,46 @@
 #!/bin/bash
-# TGW-RUN-v29-AUTODETECT-FULLPATH
+# TGW RUN.SH v28.2 - GGUF Auto-detect Fix + ExLlama2 Re-enabled + HF token support
 
 LOGFILE="/app/run.log"
 echo "----- Starting run.sh at $(date) -----" | tee $LOGFILE
 
 CMD_ARGS="--listen --extensions deep_reason,api"
 
-# Optional multimodal extension
+# Add multimodal extension if enabled
 if [ "$ENABLE_MULTIMODAL" == "true" ]; then
   echo "Multimodal extension enabled." | tee -a $LOGFILE
   CMD_ARGS="${CMD_ARGS},multimodal"
 fi
 
-# Find .gguf model in /workspace/models
+# Function: Find .gguf models in /workspace/models (non-recursive)
 find_gguf_model() {
-  echo "Looking for .gguf models in /workspace/models ..." | tee -a $LOGFILE
+  echo "Looking for .gguf models in /workspace/models ..." >&2
   local files=()
   while IFS= read -r -d $'\0' file; do
     files+=("$file")
   done < <(find /workspace/models -maxdepth 1 -type f -name '*.gguf' -print0)
 
   if [ ${#files[@]} -eq 0 ]; then
-    echo "No .gguf model files found." | tee -a $LOGFILE
+    echo "No .gguf model files found." >&2
     return 1
   elif [ ${#files[@]} -eq 1 ]; then
-    echo "Found one model: ${files[0]}" | tee -a $LOGFILE
+    echo "Found one model: ${files[0]}" >&2
     echo "${files[0]}"
     return 0
   else
-    echo "Multiple models found, picking the newest by time:" | tee -a $LOGFILE
+    echo "Multiple models found, picking newest by modification time:" >&2
     local latest=$(ls -1t "${files[@]}" | head -n1)
-    echo "$latest" | tee -a $LOGFILE
+    echo "Selected: $latest" >&2
     echo "$latest"
     return 0
   fi
 }
 
-# Auto-detect model if not specified
+# MODEL_NAME env var takes priority
 if [ -z "$MODEL_NAME" ]; then
   MODEL_PATH=$(find_gguf_model)
   if [ $? -eq 0 ]; then
     MODEL_NAME=$(basename "$MODEL_PATH")
-    MODEL_PATH="$MODEL_PATH"
     echo "Auto-detected model: $MODEL_NAME" | tee -a $LOGFILE
   else
     echo "No model specified and no local model found." | tee -a $LOGFILE
@@ -49,49 +48,52 @@ if [ -z "$MODEL_NAME" ]; then
   fi
 else
   echo "Using MODEL_NAME from env: $MODEL_NAME" | tee -a $LOGFILE
-  MODEL_PATH="/workspace/models/$MODEL_NAME"
 fi
 
-# Download fallback model if enabled
+# Default fallback model
 DEFAULT_MODEL="mlabonne_gemma-3-27b-it-abliterated-Q5_K_L.gguf"
 DEFAULT_HF_REPO="bartowski/mlabonne_gemma-3-27b-it-abliterated-GGUF"
 
 download_model() {
   local model_file="$1"
   local hf_repo="$2"
-  echo "Attempting to download $model_file from $hf_repo ..." | tee -a $LOGFILE
+  echo "Attempting to download $model_file from HF repo $hf_repo ..." | tee -a $LOGFILE
+
   if [ -n "$HF_TOKEN" ]; then
+    echo "Using huggingface-cli with HF_TOKEN" | tee -a $LOGFILE
     huggingface-cli login --token "$HF_TOKEN" 2>>$LOGFILE
     huggingface-cli repo download "$hf_repo" --filename "$model_file" --repo-type model -d /workspace/models 2>>$LOGFILE
   else
+    echo "No HF_TOKEN set, using wget for direct download" | tee -a $LOGFILE
     wget -c -O "/workspace/models/$model_file" "https://huggingface.co/$hf_repo/resolve/main/$model_file" 2>>$LOGFILE
   fi
 }
 
 if [ -z "$MODEL_NAME" ] && [ "$AUTO_DOWNLOAD" == "true" ]; then
   if [ ! -f "/workspace/models/$DEFAULT_MODEL" ]; then
-    echo "Downloading default model..." | tee -a $LOGFILE
+    echo "Default model not found locally, starting download..." | tee -a $LOGFILE
     download_model "$DEFAULT_MODEL" "$DEFAULT_HF_REPO"
     MODEL_NAME="$DEFAULT_MODEL"
-    MODEL_PATH="/workspace/models/$DEFAULT_MODEL"
   else
+    echo "Default model found locally." | tee -a $LOGFILE
     MODEL_NAME="$DEFAULT_MODEL"
-    MODEL_PATH="/workspace/models/$DEFAULT_MODEL"
-    echo "Default model already present." | tee -a $LOGFILE
   fi
 fi
 
+# Add model to command args
 if [ -n "$MODEL_NAME" ]; then
-  CMD_ARGS+=" --model $MODEL_PATH"
+  CMD_ARGS+=" --model $MODEL_NAME"
+
+  # Set loader only if GGUF file is used
   if [[ "$MODEL_NAME" == *.gguf ]]; then
     CMD_ARGS+=" --loader llama.cpp"
   fi
 else
-  echo "No model specified or found. Exiting." | tee -a $LOGFILE
+  echo "No model to load, exiting." | tee -a $LOGFILE
   exit 1
 fi
 
-# Add MoE param if set
+# Mixture of Experts (MoE)
 if [ -n "$NUM_EXPERTS_PER_TOKEN" ]; then
   CMD_ARGS+=" --num_experts_per_token $NUM_EXPERTS_PER_TOKEN"
 fi
@@ -99,4 +101,5 @@ fi
 echo "Final launch command args: $CMD_ARGS" | tee -a $LOGFILE
 echo "---------------------------------" | tee -a $LOGFILE
 
+# Start server
 exec ./start_linux.sh $CMD_ARGS 2>&1 | tee -a $LOGFILE
