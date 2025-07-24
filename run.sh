@@ -1,5 +1,5 @@
 #!/bin/bash
-# TGW RUN.SH v24 - Multimodal + Auto-detect GGUF model, auto-download fallback, HF token support
+# TGW RUN.SH v25 - GGUF-only mode, no ExLlama2, multimodal + auto model
 
 LOGFILE="/app/run.log"
 echo "----- Starting run.sh at $(date) -----" | tee $LOGFILE
@@ -11,12 +11,6 @@ if [ "$ENABLE_MULTIMODAL" == "true" ]; then
   echo "Multimodal extension enabled." | tee -a $LOGFILE
   CMD_ARGS="${CMD_ARGS},multimodal"
 fi
-
-# Load environment variables
-# MODEL_NAME: specific model folder or filename (gguf)
-# NUM_EXPERTS_PER_TOKEN: MOE param
-# HF_TOKEN: Huggingface token for gated models
-# AUTO_DOWNLOAD: "true" to enable auto-download fallback
 
 # Function: Find .gguf models in /workspace/models (non-recursive)
 find_gguf_model() {
@@ -63,7 +57,6 @@ download_model() {
   local hf_repo="$2"
   echo "Attempting to download $model_file from HF repo $hf_repo ..." | tee -a $LOGFILE
 
-  # Use huggingface-cli if token is set, else wget fallback
   if [ -n "$HF_TOKEN" ]; then
     echo "Using huggingface-cli with HF_TOKEN" | tee -a $LOGFILE
     huggingface-cli login --token "$HF_TOKEN" 2>>$LOGFILE
@@ -78,7 +71,6 @@ download_model() {
 if [ -z "$MODEL_NAME" ] && [ "$AUTO_DOWNLOAD" == "true" ]; then
   if [ ! -f "/workspace/models/$DEFAULT_MODEL" ]; then
     echo "Default model not found locally, starting download..." | tee -a $LOGFILE
-    # HF repo for default model:
     DEFAULT_HF_REPO="bartowski/mlabonne_gemma-3-27b-it-abliterated-GGUF"
     download_model "$DEFAULT_MODEL" "$DEFAULT_HF_REPO"
     MODEL_NAME="$DEFAULT_MODEL"
@@ -89,17 +81,16 @@ if [ -z "$MODEL_NAME" ] && [ "$AUTO_DOWNLOAD" == "true" ]; then
 fi
 
 if [ -n "$MODEL_NAME" ]; then
-  # Add --model argument, and --loader for .gguf models
   CMD_ARGS+=" --model $MODEL_NAME"
   if [[ "$MODEL_NAME" == *.gguf ]]; then
-    CMD_ARGS+=" --loader exllama2"
+    CMD_ARGS+=" --loader llama.cpp"
   fi
 else
   echo "No model to load, exiting." | tee -a $LOGFILE
   exit 1
 fi
 
-# MOE param
+# Optional: Mixture-of-Experts param
 if [ -n "$NUM_EXPERTS_PER_TOKEN" ]; then
   CMD_ARGS+=" --num_experts_per_token $NUM_EXPERTS_PER_TOKEN"
 fi
