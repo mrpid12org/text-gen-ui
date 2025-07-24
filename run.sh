@@ -4,7 +4,7 @@
 LOGFILE="/app/run.log"
 echo "----- Starting run.sh at $(date) -----" | tee $LOGFILE
 
-CMD_ARGS="--listen --extensions deep_reason,api"
+CMD_ARGS="--listen --listen-host 0.0.0.0 --extensions deep_reason,api"
 
 # Optional multimodal extension
 if [ "$ENABLE_MULTIMODAL" == "true" ]; then
