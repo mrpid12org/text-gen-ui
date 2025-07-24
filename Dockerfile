@@ -1,7 +1,7 @@
 # Use the correct NVIDIA CUDA runtime image for your hardware
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
-# --- DOCKERFILE VERSION: TGW-v28-EXLLAMA2-RESTORED-PY312 ---
+# --- DOCKERFILE VERSION: TGW-v28.1-EXLLAMA2-FINAL-PY312 ---
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -45,9 +45,10 @@ whl_path = hf_hub_download(repo_id='Alissonerdx/exllamav2-0.2.7-cu12.8.0.torch2.
 filename='exllamav2-0.2.7+cu12.8.0.torch2.7.0-cp312-cp312-linux_x86_64.whl'); \
 import subprocess; subprocess.run(['python3.12', '-m', 'pip', 'install', '--no-cache-dir', whl_path], check=True)"
 
-# --- 7. Setup Persistence for Models ---
-RUN mkdir -p /workspace/models
-RUN rm -rf ./models && ln -s /workspace/models ./models
+# --- 7. Setup Persistent Volume Mount for Models ---
+RUN mkdir -p /workspace/models \
+    && rm -rf /app/models \
+    && ln -s /workspace/models /app/models
 
 # --- 8. Copy updated run.sh ---
 COPY run.sh /app/run.sh
