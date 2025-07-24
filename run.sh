@@ -1,17 +1,24 @@
 #!/bin/bash
-# TGW RUN.SH v30 - Reverted to start_linux.sh to load venv correctly.
+# TGW RUN.SH v31 - Final version using bash array for robust argument passing.
 
-LOGFILE="/app/run.log"
+LOGFILE="/app/run.sh.log"
 echo "----- Starting run.sh at $(date) -----" | tee $LOGFILE
 
-# Arguments for the web UI.
-# Using --nowebui is critical to make it respect the listen host and port.
-CMD_ARGS="--nowebui --listen --listen-host 0.0.0.0 --listen-port 7860 --extensions deep_reason api"
+# Use a bash array to build arguments. This is the most reliable method.
+CMD_ARGS=()
+CMD_ARGS+=(--nowebui)
+CMD_ARGS+=(--listen)
+CMD_ARGS+=(--listen-host)
+CMD_ARGS+=(0.0.0.0)
+CMD_ARGS+=(--listen-port)
+CMD_ARGS+=(7860)
+CMD_ARGS+=(--extensions)
+CMD_ARGS+=(deep_reason api)
 
 # Optional multimodal extension
 if [ "$ENABLE_MULTIMODAL" == "true" ]; then
   echo "Multimodal extension enabled." | tee -a $LOGFILE
-  CMD_ARGS="${CMD_ARGS} multimodal"
+  CMD_ARGS+=(multimodal)
 fi
 
 # Function: Auto-discover GGUF model in /workspace/models (non-recursive)
@@ -87,12 +94,11 @@ fi
 
 # Final check before launch
 if [ -n "$MODEL_NAME" ]; then
-  CMD_ARGS+=" --model $MODEL_NAME"
-  CMD_ARGS+=" --model-dir /workspace/models"
+  CMD_ARGS+=(--model "$MODEL_NAME")
+  CMD_ARGS+=(--model-dir /workspace/models)
 
-  # GGUF loader (llama.cpp)
   if [[ "$MODEL_NAME" == *.gguf ]]; then
-    CMD_ARGS+=" --loader llama.cpp"
+    CMD_ARGS+=(--loader llama.cpp)
   fi
 else
   echo "No model to load, exiting." | tee -a $LOGFILE
@@ -101,13 +107,12 @@ fi
 
 # MoE (Mixture of Experts) config
 if [ -n "$NUM_EXPERTS_PER_TOKEN" ]; then
-  CMD_ARGS+=" --num_experts_per_token $NUM_EXPERTS_PER_TOKEN"
+  CMD_ARGS+=(--num_experts_per_token "$NUM_EXPERTS_PER_TOKEN")
 fi
 
-echo "Final launch command args: $CMD_ARGS" | tee -a $LOGFILE
+echo "Final launch command: ./start_linux.sh ${CMD_ARGS[@]}" | tee -a $LOGFILE
 echo "---------------------------------" | tee -a $LOGFILE
 
-# Launch server using the startup script to properly activate the Python venv
-# This command runs in the foreground, preventing the container from looping
+# Launch the server, passing arguments as a proper array
 cd /app
-./start_linux.sh $CMD_ARGS 2>&1 | tee -a $LOGFILE
+./start_linux.sh "${CMD_ARGS[@]}" 2>&1 | tee -a $LOGFILE
