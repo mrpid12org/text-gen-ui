@@ -1,18 +1,18 @@
 #!/bin/bash
-# TGW RUN.SH v28 - Restored ExLlama2 + GGUF auto-detect + HF support
+# TGW RUN.SH v25 - Auto-detect GGUF model, optional multimodal + HF token + fallback download
 
 LOGFILE="/app/run.log"
 echo "----- Starting run.sh at $(date) -----" | tee $LOGFILE
 
 CMD_ARGS="--listen --extensions deep_reason,api"
 
-# Add multimodal extension only if enabled
+# Add multimodal extension if enabled
 if [ "$ENABLE_MULTIMODAL" == "true" ]; then
   echo "Multimodal extension enabled." | tee -a $LOGFILE
   CMD_ARGS="${CMD_ARGS},multimodal"
 fi
 
-# Function: Find .gguf models in /workspace/models (non-recursive)
+# Function to find .gguf models in /workspace/models
 find_gguf_model() {
   echo "Looking for .gguf models in /workspace/models ..." | tee -a $LOGFILE
   local files=()
@@ -35,7 +35,7 @@ find_gguf_model() {
   fi
 }
 
-# If MODEL_NAME env var not set, try to auto-detect
+# If MODEL_NAME not set, try to detect a model
 if [ -z "$MODEL_NAME" ]; then
   MODEL_PATH=$(find_gguf_model)
   if [ $? -eq 0 ]; then
@@ -49,7 +49,7 @@ else
   echo "Using MODEL_NAME from env: $MODEL_NAME" | tee -a $LOGFILE
 fi
 
-# Default fallback model
+# Default fallback model (change as needed)
 DEFAULT_MODEL="mlabonne_gemma-3-27b-it-abliterated-Q5_K_L.gguf"
 
 download_model() {
@@ -67,7 +67,7 @@ download_model() {
   fi
 }
 
-# Download default model if needed
+# If no model found and AUTO_DOWNLOAD is enabled, fallback
 if [ -z "$MODEL_NAME" ] && [ "$AUTO_DOWNLOAD" == "true" ]; then
   if [ ! -f "/workspace/models/$DEFAULT_MODEL" ]; then
     echo "Default model not found locally, starting download..." | tee -a $LOGFILE
@@ -80,16 +80,15 @@ if [ -z "$MODEL_NAME" ] && [ "$AUTO_DOWNLOAD" == "true" ]; then
   fi
 fi
 
+# Add model argument if available
 if [ -n "$MODEL_NAME" ]; then
   CMD_ARGS+=" --model $MODEL_NAME"
-  if [[ "$MODEL_NAME" == *.gguf ]]; then
-    CMD_ARGS+=" --loader exllama2"
-  fi
 else
-  echo "No model to load, exiting." | tee -a $LOGFILE
+  echo "No model to load. Exiting." | tee -a $LOGFILE
   exit 1
 fi
 
+# Optional: add MoE config
 if [ -n "$NUM_EXPERTS_PER_TOKEN" ]; then
   CMD_ARGS+=" --num_experts_per_token $NUM_EXPERTS_PER_TOKEN"
 fi
