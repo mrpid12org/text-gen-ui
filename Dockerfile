@@ -1,7 +1,7 @@
 # Use the correct NVIDIA CUDA runtime image for your hardware
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
-# --- DOCKERFILE VERSION: TGW-v29-FINAL-AUTODETECT-FULLPATH ---
+# --- DOCKERFILE VERSION: TGW-v32-FINAL-CMDFLAGS ---
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -31,7 +31,8 @@ RUN python3.12 -m pip install --upgrade pip setuptools wheel huggingface_hub
 # --- 4. Clone Main Repo & Copy Local Extension ---
 WORKDIR /app
 ENV GIT_TERMINAL_PROMPT=0
-RUN git clone https://github.com/oobabooga/text-generation-webui.git . && git lfs pull
+RUN git clone https://github.com/oobabooga/text-generation-webui.git . \
+    && git lfs pull
 COPY deep_reason/ /app/extensions/deep_reason/
 
 # --- 5. Run the Automated Installer ---
@@ -44,13 +45,17 @@ whl_path = hf_hub_download(repo_id='Alissonerdx/exllamav2-0.2.7-cu12.8.0.torch2.
 filename='exllamav2-0.2.7+cu12.8.0.torch2.7.0-cp312-cp312-linux_x86_64.whl'); \
 import subprocess; subprocess.run(['python3.12', '-m', 'pip', 'install', '--no-cache-dir', whl_path], check=True)"
 
-# --- 7. Setup Persistence for Models ---
+# --- 7. Create CMD_FLAGS.txt with networking settings ---
+# This is the modern, reliable way to set server arguments.
+RUN echo "--listen --listen-host 0.0.0.0 --listen-port 7860 --nowebui" > /app/CMD_FLAGS.txt
+
+# --- 8. Setup Persistence for Models ---
 RUN mkdir -p /workspace/models && rm -rf /app/models && ln -s /workspace/models /app/models
 
-# --- 8. Copy run.sh ---
+# --- 9. Copy run.sh ---
 COPY run.sh /app/run.sh
 RUN chmod +x /app/run.sh
 
-# --- 9. Expose Port and Set Entrypoint ---
+# --- 10. Expose Port and Set Entrypoint ---
 EXPOSE 7860
 CMD ["/bin/bash", "run.sh"]
