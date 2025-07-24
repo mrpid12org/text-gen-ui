@@ -1,5 +1,5 @@
 #!/bin/bash
-# TGW RUN.SH v39 - Final version with correct Conda activation
+# TGW RUN.SH v40 - Final version with correct Conda activation
 
 echo "----- Starting final run.sh at $(date) -----"
 
