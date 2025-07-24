@@ -1,18 +1,18 @@
 #!/bin/bash
-# TGW RUN.SH v28.3 - Adds --model-dir for GGUF compatibility + preserves ExLlama2 & HF token support
+# TGW RUN.SH v28.4 - Adds support for DEFAULT_MODEL_NAME env var + GGUF loader fix
 
 LOGFILE="/app/run.log"
 echo "----- Starting run.sh at $(date) -----" | tee $LOGFILE
 
 CMD_ARGS="--listen --extensions deep_reason,api"
 
-# Add multimodal extension if enabled
+# Optional multimodal extension
 if [ "$ENABLE_MULTIMODAL" == "true" ]; then
   echo "Multimodal extension enabled." | tee -a $LOGFILE
   CMD_ARGS="${CMD_ARGS},multimodal"
 fi
 
-# Function: Find .gguf models in /workspace/models (non-recursive)
+# Function: Auto-discover GGUF model in /workspace/models (non-recursive)
 find_gguf_model() {
   echo "Looking for .gguf models in /workspace/models ..." >&2
   local files=()
@@ -36,8 +36,13 @@ find_gguf_model() {
   fi
 }
 
-# MODEL_NAME env var takes priority
-if [ -z "$MODEL_NAME" ]; then
+# Priority: MODEL_NAME > DEFAULT_MODEL_NAME > auto-detect > fallback
+if [ -n "$MODEL_NAME" ]; then
+  echo "Using MODEL_NAME from env: $MODEL_NAME" | tee -a $LOGFILE
+elif [ -n "$DEFAULT_MODEL_NAME" ]; then
+  echo "Using DEFAULT_MODEL_NAME from env: $DEFAULT_MODEL_NAME" | tee -a $LOGFILE
+  MODEL_NAME="$DEFAULT_MODEL_NAME"
+else
   MODEL_PATH=$(find_gguf_model)
   if [ $? -eq 0 ]; then
     MODEL_NAME=$(basename "$MODEL_PATH")
@@ -46,13 +51,11 @@ if [ -z "$MODEL_NAME" ]; then
     echo "No model specified and no local model found." | tee -a $LOGFILE
     MODEL_NAME=""
   fi
-else
-  echo "Using MODEL_NAME from env: $MODEL_NAME" | tee -a $LOGFILE
 fi
 
-# Default fallback model
-DEFAULT_MODEL="mlabonne_gemma-3-27b-it-abliterated-Q5_K_L.gguf"
-DEFAULT_HF_REPO="bartowski/mlabonne_gemma-3-27b-it-abliterated-GGUF"
+# Hard fallback default
+FALLBACK_MODEL="mlabonne_gemma-3-27b-it-abliterated-Q5_K_L.gguf"
+FALLBACK_HF_REPO="bartowski/mlabonne_gemma-3-27b-it-abliterated-GGUF"
 
 download_model() {
   local model_file="$1"
@@ -69,23 +72,23 @@ download_model() {
   fi
 }
 
+# Auto-download fallback if enabled and nothing was selected
 if [ -z "$MODEL_NAME" ] && [ "$AUTO_DOWNLOAD" == "true" ]; then
-  if [ ! -f "/workspace/models/$DEFAULT_MODEL" ]; then
-    echo "Default model not found locally, starting download..." | tee -a $LOGFILE
-    download_model "$DEFAULT_MODEL" "$DEFAULT_HF_REPO"
-    MODEL_NAME="$DEFAULT_MODEL"
+  if [ ! -f "/workspace/models/$FALLBACK_MODEL" ]; then
+    echo "Downloading fallback model..." | tee -a $LOGFILE
+    download_model "$FALLBACK_MODEL" "$FALLBACK_HF_REPO"
   else
-    echo "Default model found locally." | tee -a $LOGFILE
-    MODEL_NAME="$DEFAULT_MODEL"
+    echo "Fallback model already exists locally." | tee -a $LOGFILE
   fi
+  MODEL_NAME="$FALLBACK_MODEL"
 fi
 
-# Add model to command args
+# Final check before launch
 if [ -n "$MODEL_NAME" ]; then
   CMD_ARGS+=" --model $MODEL_NAME"
-  CMD_ARGS+=" --model-dir /workspace/models"  # <-- critical addition
+  CMD_ARGS+=" --model-dir /workspace/models"  # Critical for GGUF
 
-  # Set loader only if GGUF file is used
+  # GGUF loader (llama.cpp)
   if [[ "$MODEL_NAME" == *.gguf ]]; then
     CMD_ARGS+=" --loader llama.cpp"
   fi
@@ -94,7 +97,7 @@ else
   exit 1
 fi
 
-# Mixture of Experts (MoE)
+# MoE (Mixture of Experts) config
 if [ -n "$NUM_EXPERTS_PER_TOKEN" ]; then
   CMD_ARGS+=" --num_experts_per_token $NUM_EXPERTS_PER_TOKEN"
 fi
@@ -102,5 +105,5 @@ fi
 echo "Final launch command args: $CMD_ARGS" | tee -a $LOGFILE
 echo "---------------------------------" | tee -a $LOGFILE
 
-# Start server
+# Launch server
 exec ./start_linux.sh $CMD_ARGS 2>&1 | tee -a $LOGFILE
