@@ -1,5 +1,5 @@
 #!/bin/bash
-# TGW RUN.SH v28.2 - GGUF Auto-detect Fix + ExLlama2 Re-enabled + HF token support
+# TGW RUN.SH v28.3 - Adds --model-dir for GGUF compatibility + preserves ExLlama2 & HF token support
 
 LOGFILE="/app/run.log"
 echo "----- Starting run.sh at $(date) -----" | tee $LOGFILE
@@ -83,6 +83,7 @@ fi
 # Add model to command args
 if [ -n "$MODEL_NAME" ]; then
   CMD_ARGS+=" --model $MODEL_NAME"
+  CMD_ARGS+=" --model-dir /workspace/models"  # <-- critical addition
 
   # Set loader only if GGUF file is used
   if [[ "$MODEL_NAME" == *.gguf ]]; then
