@@ -1,5 +1,5 @@
 #!/bin/bash
-# TGW RUN.SH v25 - GGUF-only mode, no ExLlama2, multimodal + auto model
+# TGW RUN.SH v28 - Restored ExLlama2 + GGUF auto-detect + HF support
 
 LOGFILE="/app/run.log"
 echo "----- Starting run.sh at $(date) -----" | tee $LOGFILE
@@ -49,7 +49,7 @@ else
   echo "Using MODEL_NAME from env: $MODEL_NAME" | tee -a $LOGFILE
 fi
 
-# Default fallback model (can be changed)
+# Default fallback model
 DEFAULT_MODEL="mlabonne_gemma-3-27b-it-abliterated-Q5_K_L.gguf"
 
 download_model() {
@@ -67,7 +67,7 @@ download_model() {
   fi
 }
 
-# If no model found and AUTO_DOWNLOAD is true, try to download default model
+# Download default model if needed
 if [ -z "$MODEL_NAME" ] && [ "$AUTO_DOWNLOAD" == "true" ]; then
   if [ ! -f "/workspace/models/$DEFAULT_MODEL" ]; then
     echo "Default model not found locally, starting download..." | tee -a $LOGFILE
@@ -83,14 +83,13 @@ fi
 if [ -n "$MODEL_NAME" ]; then
   CMD_ARGS+=" --model $MODEL_NAME"
   if [[ "$MODEL_NAME" == *.gguf ]]; then
-    CMD_ARGS+=" --loader llama.cpp"
+    CMD_ARGS+=" --loader exllama2"
   fi
 else
   echo "No model to load, exiting." | tee -a $LOGFILE
   exit 1
 fi
 
-# Optional: Mixture-of-Experts param
 if [ -n "$NUM_EXPERTS_PER_TOKEN" ]; then
   CMD_ARGS+=" --num_experts_per_token $NUM_EXPERTS_PER_TOKEN"
 fi
