@@ -1,15 +1,15 @@
 #!/bin/bash
-# TGW RUN.SH v34 - Simplified for debugging
+# TGW RUN.SH v35 - Re-adding the --model-dir argument
 
 echo "----- Starting simplified run.sh at $(date) -----"
 
-# We will only pass the essential model arguments.
-# Network arguments are now handled by CMD_FLAGS.txt
+# We will pass the essential model arguments, including the model directory.
 CMD_ARGS_ARRAY=()
 
 if [ -n "$MODEL_NAME" ]; then
   echo "Using model from environment variable: $MODEL_NAME"
   CMD_ARGS_ARRAY+=(--model "$MODEL_NAME")
+  CMD_ARGS_ARRAY+=(--model-dir /workspace/models) # This line fixes the error
   CMD_ARGS_ARRAY+=(--loader llama.cpp)
 else
   echo "ERROR: No MODEL_NAME environment variable set."
