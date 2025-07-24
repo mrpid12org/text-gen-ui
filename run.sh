@@ -1,118 +1,85 @@
 #!/bin/bash
-# TGW RUN.SH v31 - Final version using bash array for robust argument passing.
+# TGW RUN.SH v32 - Simplified to work with CMD_FLAGS.txt
 
-LOGFILE="/app/run.sh.log"
+LOGFILE="/app/run.log"
 echo "----- Starting run.sh at $(date) -----" | tee $LOGFILE
 
-# Use a bash array to build arguments. This is the most reliable method.
-CMD_ARGS=()
-CMD_ARGS+=(--nowebui)
-CMD_ARGS+=(--listen)
-CMD_ARGS+=(--listen-host)
-CMD_ARGS+=(0.0.0.0)
-CMD_ARGS+=(--listen-port)
-CMD_ARGS+=(7860)
-CMD_ARGS+=(--extensions)
-CMD_ARGS+=(deep_reason api)
+# Start with a base set of dynamic arguments.
+# Network args are now in CMD_FLAGS.txt and will be loaded automatically.
+CMD_ARGS_ARRAY=()
+CMD_ARGS_ARRAY+=(--extensions deep_reason api)
 
 # Optional multimodal extension
 if [ "$ENABLE_MULTIMODAL" == "true" ]; then
   echo "Multimodal extension enabled." | tee -a $LOGFILE
-  CMD_ARGS+=(multimodal)
+  CMD_ARGS_ARRAY+=(multimodal)
 fi
 
-# Function: Auto-discover GGUF model in /workspace/models (non-recursive)
+# Function to find a GGUF model
 find_gguf_model() {
-  echo "Looking for .gguf models in /workspace/models ..." >&2
-  local files=()
-  while IFS= read -r -d $'\0' file; do
-    files+=("$file")
-  done < <(find /workspace/models -maxdepth 1 -type f -name '*.gguf' -print0)
-
-  if [ ${#files[@]} -eq 0 ]; then
-    echo "No .gguf model files found." >&2
-    return 1
-  elif [ ${#files[@]} -eq 1 ]; then
-    echo "Found one model: ${files[0]}" >&2
-    echo "${files[0]}"
-    return 0
-  else
-    echo "Multiple models found, picking newest by modification time:" >&2
-    local latest=$(ls -1t "${files[@]}" | head -n1)
-    echo "Selected: $latest" >&2
-    echo "$latest"
-    return 0
-  fi
+  find /workspace/models -maxdepth 1 -type f -name '*.gguf' -print0 | {
+    local files=()
+    while IFS= read -r -d $'\0' file; do
+      files+=("$file")
+    done
+    
+    if [ ${#files[@]} -eq 1 ]; then
+      echo "${files[0]}"
+    elif [ ${#files[@]} -gt 1 ]; then
+      ls -1t "${files[@]}" | head -n1
+    fi
+  }
 }
 
-# Priority: MODEL_NAME > DEFAULT_MODEL_NAME > auto-detect > fallback
-if [ -n "$MODEL_NAME" ]; then
-  echo "Using MODEL_NAME from env: $MODEL_NAME" | tee -a $LOGFILE
-elif [ -n "$DEFAULT_MODEL_NAME" ]; then
-  echo "Using DEFAULT_MODEL_NAME from env: $DEFAULT_MODEL_NAME" | tee -a $LOGFILE
+# Model selection logic
+if [ -z "$MODEL_NAME" ] && [ -n "$DEFAULT_MODEL_NAME" ]; then
   MODEL_NAME="$DEFAULT_MODEL_NAME"
-else
+fi
+
+if [ -z "$MODEL_NAME" ]; then
   MODEL_PATH=$(find_gguf_model)
-  if [ $? -eq 0 ]; then
+  if [ -n "$MODEL_PATH" ]; then
     MODEL_NAME=$(basename "$MODEL_PATH")
     echo "Auto-detected model: $MODEL_NAME" | tee -a $LOGFILE
-  else
-    echo "No model specified and no local model found." | tee -a $LOGFILE
-    MODEL_NAME=""
   fi
 fi
 
-# Hard fallback default
-FALLBACK_MODEL="mlabonne_gemma-3-27b-it-abliterated-Q5_K_L.gguf"
-FALLBACK_HF_REPO="bartowski/mlabonne_gemma-3-27b-it-abliterated-GGUF"
-
-download_model() {
-  local model_file="$1"
-  local hf_repo="$2"
-  echo "Attempting to download $model_file from HF repo $hf_repo ..." | tee -a $LOGFILE
-
-  if [ -n "$HF_TOKEN" ]; then
-    echo "Using huggingface-cli with HF_TOKEN" | tee -a $LOGFILE
-    huggingface-cli login --token "$HF_TOKEN" 2>>$LOGFILE
-    huggingface-cli repo download "$hf_repo" --filename "$model_file" --repo-type model -d /workspace/models 2>>$LOGFILE
-  else
-    echo "No HF_TOKEN set, using wget for direct download" | tee -a $LOGFILE
-    wget -c -O "/workspace/models/$model_file" "https://huggingface.co/$hf_repo/resolve/main/$model_file" 2>>$LOGFILE
-  fi
-}
-
-# Auto-download fallback if enabled and nothing was selected
-if [ -z "$MODEL_NAME" ] && [ "$AUTO_DOWNLOAD" == "true" ]; then
-  if [ ! -f "/workspace/models/$FALLBACK_MODEL" ]; then
-    echo "Downloading fallback model..." | tee -a $LOGFILE
-    download_model "$FALLBACK_MODEL" "$FALLBACK_HF_REPO"
-  else
-    echo "Fallback model already exists locally." | tee -a $LOGFILE
-  fi
-  MODEL_NAME="$FALLBACK_MODEL"
-fi
-
-# Final check before launch
+# If a model is specified (either by env var or auto-detect), add it to args
 if [ -n "$MODEL_NAME" ]; then
-  CMD_ARGS+=(--model "$MODEL_NAME")
-  CMD_ARGS+=(--model-dir /workspace/models)
-
+  echo "Using model: $MODEL_NAME" | tee -a $LOGFILE
+  CMD_ARGS_ARRAY+=(--model "$MODEL_NAME")
+  CMD_ARGS_ARRAY+=(--model-dir /workspace/models)
   if [[ "$MODEL_NAME" == *.gguf ]]; then
-    CMD_ARGS+=(--loader llama.cpp)
+    CMD_ARGS_ARRAY+=(--loader llama.cpp)
   fi
 else
-  echo "No model to load, exiting." | tee -a $LOGFILE
-  exit 1
+  # Auto-download fallback if enabled and no other model was found
+  if [ "$AUTO_DOWNLOAD" == "true" ]; then
+    FALLBACK_MODEL="mlabonne_gemma-3-27b-it-abliterated-Q5_K_L.gguf"
+    FALLBACK_HF_REPO="bartowski/mlabonne_gemma-3-27b-it-abliterated-GGUF"
+    if [ ! -f "/workspace/models/$FALLBACK_MODEL" ]; then
+      echo "No model found, downloading fallback model..." | tee -a $LOGFILE
+      huggingface-cli download "$FALLBACK_HF_REPO" "$FALLBACK_MODEL" --local-dir /workspace/models --local-dir-use-symlinks False
+    fi
+    CMD_ARGS_ARRAY+=(--model "$FALLBACK_MODEL")
+    CMD_ARGS_ARRAY+=(--model-dir /workspace/models)
+    CMD_ARGS_ARRAY+=(--loader llama.cpp)
+  else
+    echo "No model specified or found, and auto-download is disabled." | tee -a $LOGFILE
+    echo "Please specify a MODEL_NAME or place a model in /workspace/models." | tee -a $LOGFILE
+    exit 1
+  fi
 fi
 
 # MoE (Mixture of Experts) config
 if [ -n "$NUM_EXPERTS_PER_TOKEN" ]; then
-  CMD_ARGS+=(--num_experts_per_token "$NUM_EXPERTS_PER_TOKEN")
+  CMD_ARGS_ARRAY+=(--num_experts_per_token "$NUM_EXPERTS_PER_TOKEN")
 fi
 
-echo "Final launch command: ./start_linux.sh ${CMD_ARGS[@]}" | tee -a $LOGFILE
+echo "Additional args: ${CMD_ARGS_ARRAY[@]}" | tee -a $LOGFILE
 echo "---------------------------------" | tee -a $LOGFILE
 
-# Launch the server, passing arguments as a proper array
+# Launch the server. It will automatically read CMD_FLAGS.txt
+# and combine them with the arguments provided here.
 cd /app
-./start_linux.sh "${CMD_ARGS[@]}" 2>&1 | tee -a $LOGFILE
+./start_linux.sh "${CMD_ARGS_ARRAY[@]}" 2>&1 | tee -a $LOGFILE
