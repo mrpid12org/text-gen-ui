@@ -1,5 +1,5 @@
 #!/bin/bash
-# TGW RUN.SH v46 - Using the correct --llama_cpp_args flag
+# TGW RUN.SH v47 - Simplified for patched Dockerfile
 
 echo "----- Starting final run.sh at $(date) -----"
 
@@ -11,7 +11,6 @@ conda activate /app/installer_files/env
 CMD_ARGS_ARRAY=()
 
 # --- Model Selection & Loader ---
-# These are the primary settings.
 if [ -n "$MODEL_NAME" ]; then
   echo "Using model from environment variable: $MODEL_NAME"
   CMD_ARGS_ARRAY+=(--model "$MODEL_NAME")
@@ -22,10 +21,6 @@ else
   exit 1
 fi
 
-# --- Networking for the llama.cpp backend ---
-# This is the correct, specific argument to control the llama.cpp server.
-CMD_ARGS_ARRAY+=("--llama_cpp_args=--host 0.0.0.0 --port 7860")
-
 # --- Extensions ---
 BASE_EXTENSIONS="deep_reason,api"
 if [ "$ENABLE_MULTIMODAL" == "true" ]; then
@@ -35,10 +30,14 @@ else
 fi
 CMD_ARGS_ARRAY+=(--extensions "$FINAL_EXTENSIONS")
 
+
 # --- Optional MoE config ---
 if [ -n "$NUM_EXPERTS_PER_TOKEN" ]; then
   CMD_ARGS_ARRAY+=(--num_experts_per_token "$NUM_EXPERTS_PER_TOKEN")
 fi
+
+# Add the --nowebui flag to ensure the llama.cpp server is used
+CMD_ARGS_ARRAY+=(--nowebui)
 
 echo "Conda env activated. Running python server.py with args: ${CMD_ARGS_ARRAY[@]}"
 echo "---------------------------------"
