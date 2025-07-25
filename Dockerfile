@@ -1,7 +1,7 @@
 # Use the correct NVIDIA CUDA runtime image for your hardware
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
-# --- DOCKERFILE VERSION: TGW-v41-FINAL ---
+# --- DOCKERFILE VERSION: TGW-v42-FINAL ---
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -22,14 +22,14 @@ COPY deep_reason/ /app/extensions/deep_reason/
 # --- 3. Run Installer & Install Custom Wheel ---
 # This single RUN command ensures everything is installed inside the Conda environment.
 RUN \
-  # First, run the official installer with GPU_CHOICE=E to select CUDA 12.8 non-interactively
-  GPU_CHOICE=E ./start_linux.sh && \
+  # Set env vars to make the installer non-interactive and prevent the final launch
+  GPU_CHOICE=E LAUNCH_AFTER_INSTALL=FALSE ./start_linux.sh && \
   \
-  # Next, activate the Conda environment that was just created
+  # Activate the Conda environment that was just created
   source /app/installer_files/conda/etc/profile.d/conda.sh && \
   conda activate /app/installer_files/env && \
   \
-  # Now, install the high-performance ExLlama2 wheel into that active environment
+  # Now, install the high-performance ExLlama2 into that active environment
   echo "Installing ExLlama2..." && \
   pip install exllamav2
 
