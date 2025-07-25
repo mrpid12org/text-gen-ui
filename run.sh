@@ -1,24 +1,23 @@
 #!/bin/bash
-# TGW RUN.SH v40 - Final version with correct Conda activation
+# TGW RUN.SH v41 - Using llama.cpp server arguments
 
 echo "----- Starting final run.sh at $(date) -----"
 
 # --- 1. Activate Conda Environment ---
-# This is the key step revealed by the start_linux.sh script.
 source /app/installer_files/conda/etc/profile.d/conda.sh
 conda activate /app/installer_files/env
 
 # --- 2. Build Argument Array ---
-# Now we can safely add all the arguments we need.
 CMD_ARGS_ARRAY=()
 
-# --- Networking ---
-CMD_ARGS_ARRAY+=(--listen)
-CMD_ARGS_ARRAY+=(--listen-port)
+# --- Networking for the llama.cpp backend server ---
+# This is the final key change.
+CMD_ARGS_ARRAY+=(--host)
+CMD_ARGS_ARRAY+=(0.0.0.0)
+CMD_ARGS_ARRAY+=(--port)
 CMD_ARGS_ARRAY+=(7860)
 
 # --- Extensions ---
-# Re-enabling your extensions. Assumes ENABLE_MULTIMODAL is an env var.
 BASE_EXTENSIONS="deep_reason,api"
 if [ "$ENABLE_MULTIMODAL" == "true" ]; then
   FINAL_EXTENSIONS="$BASE_EXTENSIONS,multimodal"
