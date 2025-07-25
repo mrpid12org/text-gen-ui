@@ -1,17 +1,18 @@
 # Use the correct NVIDIA CUDA runtime image for your hardware
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
-# --- DOCKERFILE VERSION: TGW-v43-FINAL ---
+# --- DOCKERFILE VERSION: TGW-v44-FINAL ---
 
 # --- 1. Set Environment ---
 ENV DEBIAN_FRONTEND=noninteractive
 
 # --- 2. Switch to Bash Shell ---
-# This is the key fix. It makes 'source' and other bash commands available.
+# This makes 'source' and other bash commands available.
 SHELL ["/bin/bash", "-c"]
 
 # --- 3. Install System Dependencies ---
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Added "rm -rf" to clear the apt cache and prevent mirror sync errors.
+RUN rm -rf /var/lib/apt/lists/* && apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     git \
@@ -25,7 +26,6 @@ RUN git clone https://github.com/oobabooga/text-generation-webui.git .
 COPY deep_reason/ /app/extensions/deep_reason/
 
 # --- 5. Run Installer & Install Custom Wheel ---
-# This single RUN command ensures everything is installed inside the Conda environment.
 RUN \
   # Set env vars to make the installer non-interactive and prevent the final launch
   GPU_CHOICE=E LAUNCH_AFTER_INSTALL=FALSE ./start_linux.sh && \
@@ -34,7 +34,7 @@ RUN \
   source /app/installer_files/conda/etc/profile.d/conda.sh && \
   conda activate /app/installer_files/env && \
   \
-  # Now, install the high-performance ExLlama2 into that active environment
+  # Now, install high-performance ExLlama2 into that active environment
   echo "Installing ExLlama2..." && \
   pip install exllamav2
 
