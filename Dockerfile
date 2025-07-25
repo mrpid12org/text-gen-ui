@@ -1,52 +1,48 @@
-# Use the correct NVIDIA CUDA runtime image for your hardware
-FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
+#!/bin/bash
+# TGW RUN.SH v46 - Using the correct --llama_cpp_args flag
 
-# --- DOCKERFILE VERSION: TGW-v46-FINAL ---
+echo "----- Starting final run.sh at $(date) -----"
 
-# --- 1. Set Environment ---
-ENV DEBIAN_FRONTEND=noninteractive
+# --- 1. Activate Conda Environment ---
+source /app/installer_files/conda/etc/profile.d/conda.sh
+conda activate /app/installer_files/env
 
-# --- 2. Switch to Bash Shell ---
-SHELL ["/bin/bash", "-c"]
+# --- 2. Build Argument Array ---
+CMD_ARGS_ARRAY=()
 
-# --- 3. Install System Dependencies ---
-# By removing the cuda sources list, we prevent apt from contacting the failing NVIDIA server.
-RUN rm -f /etc/apt/sources.list.d/cuda*.list && \
-    rm -rf /var/lib/apt/lists/* && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-    curl \
-    wget \
-    git \
-    git-lfs \
-    build-essential
+# --- Model Selection & Loader ---
+# These are the primary settings.
+if [ -n "$MODEL_NAME" ]; then
+  echo "Using model from environment variable: $MODEL_NAME"
+  CMD_ARGS_ARRAY+=(--model "$MODEL_NAME")
+  CMD_ARGS_ARRAY+=(--model-dir /workspace/models)
+  CMD_ARGS_ARRAY+=(--loader llama.cpp)
+else
+  echo "ERROR: No MODEL_NAME environment variable set. Cannot start."
+  exit 1
+fi
 
-# --- 4. Clone Main Repo & Your Custom Extension ---
-WORKDIR /app
-ENV GIT_TERMINAL_PROMPT=0
-RUN git clone https://github.com/oobabooga/text-generation-webui.git .
-COPY deep_reason/ /app/extensions/deep_reason/
+# --- Networking for the llama.cpp backend ---
+# This is the correct, specific argument to control the llama.cpp server.
+CMD_ARGS_ARRAY+=("--llama_cpp_args=--host 0.0.0.0 --port 7860")
 
-# --- 5. Run Installer & Install Custom Wheel ---
-RUN \
-  # Set env vars to make the installer non-interactive and prevent the final launch
-  GPU_CHOICE=E LAUNCH_AFTER_INSTALL=FALSE ./start_linux.sh && \
-  \
-  # Activate the Conda environment that was just created
-  source /app/installer_files/conda/etc/profile.d/conda.sh && \
-  conda activate /app/installer_files/env && \
-  \
-  # Now, install high-performance ExLlama2 into that active environment
-  echo "Installing ExLlama2..." && \
-  pip install exllamav2
+# --- Extensions ---
+BASE_EXTENSIONS="deep_reason,api"
+if [ "$ENABLE_MULTIMODAL" == "true" ]; then
+  FINAL_EXTENSIONS="$BASE_EXTENSIONS,multimodal"
+else
+  FINAL_EXTENSIONS="$BASE_EXTENSIONS"
+fi
+CMD_ARGS_ARRAY+=(--extensions "$FINAL_EXTENSIONS")
 
-# --- 6. Setup Persistence for Models ---
-RUN mkdir -p /workspace/models && rm -rf /app/models && ln -s /workspace/models /app/models
+# --- Optional MoE config ---
+if [ -n "$NUM_EXPERTS_PER_TOKEN" ]; then
+  CMD_ARGS_ARRAY+=(--num_experts_per_token "$NUM_EXPERTS_PER_TOKEN")
+fi
 
-# --- 7. Copy run.sh ---
-COPY run.sh /app/run.sh
-RUN chmod +x /app/run.sh
+echo "Conda env activated. Running python server.py with args: ${CMD_ARGS_ARRAY[@]}"
+echo "---------------------------------"
 
-# --- 8. Expose Port and Set Entrypoint ---
-EXPOSE 7860
-CMD ["/bin/bash", "run.sh"]
+# --- 3. Launch Server Directly ---
+cd /app
+python server.py "${CMD_ARGS_ARRAY[@]}"
