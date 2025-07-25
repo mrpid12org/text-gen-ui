@@ -1,7 +1,7 @@
 # Use the correct NVIDIA CUDA runtime image for your hardware
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
-# --- DOCKERFILE VERSION: TGW-v45-FINAL ---
+# --- DOCKERFILE VERSION: TGW-v46-FINAL ---
 
 # --- 1. Set Environment ---
 ENV DEBIAN_FRONTEND=noninteractive
@@ -10,9 +10,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 SHELL ["/bin/bash", "-c"]
 
 # --- 3. Install System Dependencies ---
-# Using a more robust apt-get command to bypass persistent cache issues.
-RUN rm -rf /var/lib/apt/lists/* && \
-    apt-get update -o Acquire::By-Hash=no -o Acquire::Pdiffs=false && \
+# By removing the cuda sources list, we prevent apt from contacting the failing NVIDIA server.
+RUN rm -f /etc/apt/sources.list.d/cuda*.list && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
     curl \
     wget \
