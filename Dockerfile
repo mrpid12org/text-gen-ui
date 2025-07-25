@@ -1,7 +1,7 @@
 # Use the correct NVIDIA CUDA runtime image for your hardware
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
-# --- DOCKERFILE VERSION: TGW-v46-FINAL ---
+# --- DOCKERFILE VERSION: TGW-v47-PATCHED ---
 
 # --- 1. Set Environment ---
 ENV DEBIAN_FRONTEND=noninteractive
@@ -10,7 +10,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 SHELL ["/bin/bash", "-c"]
 
 # --- 3. Install System Dependencies ---
-# By removing the cuda sources list, we prevent apt from contacting the failing NVIDIA server.
 RUN rm -f /etc/apt/sources.list.d/cuda*.list && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get update && \
@@ -29,24 +28,23 @@ COPY deep_reason/ /app/extensions/deep_reason/
 
 # --- 5. Run Installer & Install Custom Wheel ---
 RUN \
-  # Set env vars to make the installer non-interactive and prevent the final launch
   GPU_CHOICE=E LAUNCH_AFTER_INSTALL=FALSE ./start_linux.sh && \
-  \
-  # Activate the Conda environment that was just created
   source /app/installer_files/conda/etc/profile.d/conda.sh && \
   conda activate /app/installer_files/env && \
-  \
-  # Now, install high-performance ExLlama2 into that active environment
   echo "Installing ExLlama2..." && \
   pip install exllamav2
 
-# --- 6. Setup Persistence for Models ---
+# --- 6. Patch the Source Code ---
+# This is the definitive fix: change the hard-coded localhost address.
+RUN sed -i "s/'--host', '127.0.0.1'/'--host', '0.0.0.0'/" modules/models.py
+
+# --- 7. Setup Persistence for Models ---
 RUN mkdir -p /workspace/models && rm -rf /app/models && ln -s /workspace/models /app/models
 
-# --- 7. Copy run.sh ---
+# --- 8. Copy run.sh ---
 COPY run.sh /app/run.sh
 RUN chmod +x /app/run.sh
 
-# --- 8. Expose Port and Set Entrypoint ---
+# --- 9. Expose Port and Set Entrypoint ---
 EXPOSE 7860
 CMD ["/bin/bash", "run.sh"]
