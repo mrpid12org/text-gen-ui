@@ -1,11 +1,16 @@
 # Use the correct NVIDIA CUDA runtime image for your hardware
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
-# --- DOCKERFILE VERSION: TGW-v42-FINAL ---
+# --- DOCKERFILE VERSION: TGW-v43-FINAL ---
 
+# --- 1. Set Environment ---
 ENV DEBIAN_FRONTEND=noninteractive
 
-# --- 1. Install System Dependencies ---
+# --- 2. Switch to Bash Shell ---
+# This is the key fix. It makes 'source' and other bash commands available.
+SHELL ["/bin/bash", "-c"]
+
+# --- 3. Install System Dependencies ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
@@ -13,13 +18,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git-lfs \
     build-essential
 
-# --- 2. Clone Main Repo & Your Custom Extension ---
+# --- 4. Clone Main Repo & Your Custom Extension ---
 WORKDIR /app
 ENV GIT_TERMINAL_PROMPT=0
 RUN git clone https://github.com/oobabooga/text-generation-webui.git .
 COPY deep_reason/ /app/extensions/deep_reason/
 
-# --- 3. Run Installer & Install Custom Wheel ---
+# --- 5. Run Installer & Install Custom Wheel ---
 # This single RUN command ensures everything is installed inside the Conda environment.
 RUN \
   # Set env vars to make the installer non-interactive and prevent the final launch
@@ -33,13 +38,13 @@ RUN \
   echo "Installing ExLlama2..." && \
   pip install exllamav2
 
-# --- 4. Setup Persistence for Models ---
+# --- 6. Setup Persistence for Models ---
 RUN mkdir -p /workspace/models && rm -rf /app/models && ln -s /workspace/models /app/models
 
-# --- 5. Copy run.sh ---
+# --- 7. Copy run.sh ---
 COPY run.sh /app/run.sh
 RUN chmod +x /app/run.sh
 
-# --- 6. Expose Port and Set Entrypoint ---
+# --- 8. Expose Port and Set Entrypoint ---
 EXPOSE 7860
 CMD ["/bin/bash", "run.sh"]
