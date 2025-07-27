@@ -1,9 +1,8 @@
-# Dockerfile - V1.7
+# Dockerfile - V1.8
 # Switch from the 'runtime' to the 'devel' image to include the full CUDA toolkit,
 # which is required to compile llama-cpp-python with GPU support.
 FROM nvidia/cuda:12.8.0-devel-ubuntu22.04
 
-# --- FIX V1.7 ---
 # Add all necessary library and binary paths to the environment. This ensures
 # that the compiler and linker can find the CUDA toolkit and system libraries.
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
@@ -15,12 +14,14 @@ ENV CONDA_DIR=/opt/conda
 ENV PATH=$CONDA_DIR/bin:$PATH
 
 # Install system packages
+# --- FIX V1.8 (Addition) ---
+# Added libgomp1 to ensure the OpenMP library is available to the linker.
 RUN apt-get update && apt-get install -y \
     wget git curl vim unzip build-essential \
     python3 python3-pip python3-venv \
     ca-certificates sudo software-properties-common \
     libglib2.0-0 libsm6 libxrender1 libxext6 libgl1-mesa-glx \
-    cmake libopenblas-dev \
+    cmake libopenblas-dev libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Miniconda to the new, isolated path
@@ -51,11 +52,12 @@ RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
 # Install Python dependencies from your requirements.txt
 RUN $TEXTGEN_ENV_DIR/bin/pip install -r requirements.txt
 
+# --- FIX V1.8 (Modification) ---
 # Clone and build llama-cpp-python with CUDA/cuBLAS support
-# The build flag has been updated from LLAMA_CUBLAS to GGML_CUDA.
+# Added an explicit linker flag to tell CMake where to find the CUDA libraries.
 RUN git clone --recursive https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-python && \
     cd /app/llama-cpp-python && \
-    CMAKE_ARGS="-DGGML_CUDA=on" FORCE_CMAKE=1 $TEXTGEN_ENV_DIR/bin/pip install .
+    CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_LIBRARY=/usr/local/cuda/lib64" FORCE_CMAKE=1 $TEXTGEN_ENV_DIR/bin/pip install .
 
 # Patch the hard-coded localhost binding for the llama.cpp backend
 RUN sed -i 's/127.0.0.1/0.0.0.0/g' /app/modules/llama_cpp_server.py
