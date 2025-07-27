@@ -1,15 +1,15 @@
-# Dockerfile - V1.6
+# Dockerfile - V1.7
 # Switch from the 'runtime' to the 'devel' image to include the full CUDA toolkit,
 # which is required to compile llama-cpp-python with GPU support.
 FROM nvidia/cuda:12.8.0-devel-ubuntu22.04
 
-# --- FIX V1.6 ---
-# Add CUDA library and binary paths to the environment. This ensures that the
-# linker can find the necessary CUDA libraries during the build process.
-ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+# --- FIX V1.7 ---
+# Add all necessary library and binary paths to the environment. This ensures
+# that the compiler and linker can find the CUDA toolkit and system libraries.
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
 ENV PATH=/usr/local/cuda/bin:$PATH
-
 ENV DEBIAN_FRONTEND=noninteractive
+
 # Isolate Conda from the application directory to prevent conflicts
 ENV CONDA_DIR=/opt/conda
 ENV PATH=$CONDA_DIR/bin:$PATH
