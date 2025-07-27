@@ -1,5 +1,5 @@
 #!/bin/bash
-# TGW RUN.SH v47 - Simplified for patched Dockerfile
+# TGW RUN.SH v48 - FINAL
 
 echo "----- Starting final run.sh at $(date) -----"
 
@@ -9,6 +9,13 @@ conda activate /app/installer_files/env
 
 # --- 2. Build Argument Array ---
 CMD_ARGS_ARRAY=()
+
+# --- Networking ---
+# These are the standard arguments for the main UI.
+# They will now work because we have patched the backend.
+CMD_ARGS_ARRAY+=(--listen)
+CMD_ARGS_ARRAY+=(--listen-port)
+CMD_ARGS_ARRAY+=(7860)
 
 # --- Model Selection & Loader ---
 if [ -n "$MODEL_NAME" ]; then
@@ -35,9 +42,6 @@ CMD_ARGS_ARRAY+=(--extensions "$FINAL_EXTENSIONS")
 if [ -n "$NUM_EXPERTS_PER_TOKEN" ]; then
   CMD_ARGS_ARRAY+=(--num_experts_per_token "$NUM_EXPERTS_PER_TOKEN")
 fi
-
-# Add the --nowebui flag to ensure the patched llama.cpp server is used
-CMD_ARGS_ARRAY+=(--nowebui)
 
 echo "Conda env activated. Running python server.py with args: ${CMD_ARGS_ARRAY[@]}"
 echo "---------------------------------"
