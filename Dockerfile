@@ -1,4 +1,4 @@
-# Dockerfile - V2.0
+# Dockerfile - V2.1
 # =================================================================================================
 # STAGE 1: The "Builder" - For building on GitHub Actions (no GPU)
 # =================================================================================================
@@ -9,7 +9,7 @@ FROM nvidia/cuda:12.8.0-devel-ubuntu22.04 AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 ENV CONDA_DIR=/opt/conda
 ENV TEXTGEN_ENV_DIR=$CONDA_DIR/envs/textgen
-ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
 ENV PATH=$CONDA_DIR/bin:/usr/local/cuda/bin:$PATH
 
 # Install all build-time system dependencies
@@ -35,11 +35,9 @@ WORKDIR /app
 
 # Clone the web UI repository
 RUN git clone https://github.com/oobabooga/text-generation-webui.git .
-
 # Copy your local project files (requirements.txt, run.sh, etc.) into the builder
 COPY . .
-
-# --- FIX V2.0 ---
+# --- FIX V2.1 ---
 # Create the conda environment and install all Python dependencies.
 # The reference to the non-existent requirements.txt has been removed.
 # It now correctly installs the base requirements from the cloned repo,
@@ -53,7 +51,7 @@ RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
 # Clone and build with the corrected linker flags for a non-GPU build environment
 RUN git clone --recursive https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-python && \
     cd /app/llama-cpp-python && \
-    LDFLAGS="-L/usr/local/cuda/lib64/stubs -Wl,-rpath-link,/usr/local/cuda/lib64/stubs" \
+    LDFLAGS="-L/usr/local/cuda/lib64 -Wl,-rpath-link,/usr/local/cuda/lib64" \
     CMAKE_ARGS="-DGGML_CUDA=on" \
     FORCE_CMAKE=1 \
     $TEXTGEN_ENV_DIR/bin/pip install .
