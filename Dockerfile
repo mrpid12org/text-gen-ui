@@ -1,4 +1,4 @@
-# Dockerfile - V1.1
+# Dockerfile - V1.2
 # Use CUDA 12.8 runtime image as base
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
@@ -21,10 +21,11 @@ RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -
     bash miniconda.sh -b -p $CONDA_DIR && \
     rm miniconda.sh
 
-# --- FIX V1.1 ---
-# Accept Anaconda Terms of Service to prevent build failure.
-# Also disable auto-updates for more stable builds.
-RUN conda config --set auto_update_conda false && conda tos accept --override-channels
+# --- FIX V1.2 ---
+# Accept Anaconda Terms of Service for the specific default channels.
+RUN conda config --set auto_update_conda false && \
+    conda tos accept --channel https://repo.anaconda.com/pkgs/main && \
+    conda tos accept --channel https://repo.anaconda.com/pkgs/r
 
 # Set working directory, which is now guaranteed to be empty
 WORKDIR /app
