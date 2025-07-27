@@ -1,64 +1,91 @@
-# Dockerfile - V1.9
-# Switch from the 'runtime' to the 'devel' image to include the full CUDA toolkit,
-# which is required to compile llama-cpp-python with GPU support.
-FROM nvidia/cuda:12.8.0-devel-ubuntu22.04
+# =================================================================================================
+# STAGE 1: The "Builder" - For building on GitHub Actions (no GPU)
+# =================================================================================================
+# Use the specified 12.8.0 'devel' image with the full CUDA toolkit for compilation.
+FROM nvidia/cuda:12.8.0-devel-ubuntu22.04 AS builder
 
-# Add all necessary library and binary paths to the environment. This ensures
-# that the compiler and linker can find the CUDA toolkit and system libraries.
-ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
-ENV PATH=/usr/local/cuda/bin:$PATH
+# Set environment variables for non-interactive setup and paths
 ENV DEBIAN_FRONTEND=noninteractive
-
-# Isolate Conda from the application directory to prevent conflicts
 ENV CONDA_DIR=/opt/conda
-ENV PATH=$CONDA_DIR/bin:$PATH
+ENV TEXTGEN_ENV_DIR=$CONDA_DIR/envs/textgen
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+ENV PATH=$CONDA_DIR/bin:/usr/local/cuda/bin:$PATH
 
-# Install system packages
-# Added libgomp1 to ensure the OpenMP library is available to the linker.
-RUN apt-get update && apt-get install -y \
+# Install all build-time system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
     wget git curl vim unzip build-essential \
-    python3 python3-pip python3-venv \
+    python3 python3-pip \
     ca-certificates sudo software-properties-common \
     libglib2.0-0 libsm6 libxrender1 libxext6 libgl1-mesa-glx \
     cmake libopenblas-dev libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Miniconda to the new, isolated path
+# Install Miniconda and accept Terms of Service
 RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh && \
     bash miniconda.sh -b -p $CONDA_DIR && \
-    rm miniconda.sh
-
-# Accept Anaconda Terms of Service for the specific default channels.
-RUN conda config --set auto_update_conda false && \
+    rm miniconda.sh && \
+    conda config --set auto_update_conda false && \
     conda tos accept --channel https://repo.anaconda.com/pkgs/main && \
-    conda tos accept --channel https://repo.anaconda.com/pkgs/r
+    conda tos accept --channel https://repo.anaconda.com/pkgs/r && \
+    conda clean -afy
 
-# Set working directory, which is now guaranteed to be empty
+# Set the working directory for the application
 WORKDIR /app
 
-# This command will now succeed
+# Clone the web UI repository
 RUN git clone https://github.com/oobabooga/text-generation-webui.git .
 
-# Copy your local modifications: run.sh, requirements.txt, etc.
+# Copy your local project files (requirements.txt, run.sh, etc.) into the builder
 COPY . .
 
-# All paths now reference the new, isolated Conda environment
-ENV TEXTGEN_ENV_DIR=$CONDA_DIR/envs/textgen
+# Create the conda environment and install all Python dependencies in the correct order
 RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
     conda install -y -p $TEXTGEN_ENV_DIR pip && \
-    $TEXTGEN_ENV_DIR/bin/pip install --upgrade pip
+    $TEXTGEN_ENV_DIR/bin/pip install --upgrade pip && \
+    $TEXTGEN_ENV_DIR/bin/pip install -r requirements.txt && \
+    $TEXTGEN_ENV_DIR/bin/pip install -r requirements-custom.txt
 
-# Install Python dependencies from your requirements.txt
-RUN $TEXTGEN_ENV_DIR/bin/pip install -r requirements.txt
-
-# --- FIX V1.9 ---
-# Clone and build llama-cpp-python with CUDA/cuBLAS support
-# Add LDFLAGS to explicitly tell the linker where to find the CUDA stub libraries.
+# --- CORRECTED BUILD STEP for llama-cpp-python ---
+# Clone and build with the corrected linker flags for a non-GPU build environment
 RUN git clone --recursive https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-python && \
     cd /app/llama-cpp-python && \
-    LDFLAGS="-L/usr/local/cuda/lib64/stubs" CMAKE_ARGS="-DGGML_CUDA=on" FORCE_CMAKE=1 $TEXTGEN_ENV_DIR/bin/pip install .
+    LDFLAGS="-L/usr/local/cuda/lib64/stubs -Wl,-rpath-link,/usr/local/cuda/lib64/stubs" \
+    CMAKE_ARGS="-DGGML_CUDA=on" \
+    FORCE_CMAKE=1 \
+    $TEXTGEN_ENV_DIR/bin/pip install .
 
-# Patch the hard-coded localhost binding for the llama.cpp backend
+# =================================================================================================
+# STAGE 2: The "Final" Image - For running on RunPod (with GPU)
+# =================================================================================================
+# Start from the leaner 'base' image which only contains the CUDA runtime
+FROM nvidia/cuda:12.8.0-base-ubuntu22.04
+
+# Set environment variables for the runtime
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CONDA_DIR=/opt/conda
+ENV TEXTGEN_ENV_DIR=$CONDA_DIR/envs/textgen
+ENV PATH=$TEXTGEN_ENV_DIR/bin:$CONDA_DIR/bin:$PATH
+
+# Set NVIDIA container runtime variables to ensure GPU access on RunPod
+ENV NVIDIA_VISIBLE_DEVICES all
+ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
+
+# Install only essential RUNTIME system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libglib2.0-0 libsm6 libxrender1 libxext6 libgl1-mesa-glx \
+    libopenblas-dev libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set the working directory
+WORKDIR /app
+
+# Copy the fully configured Conda environment (with all packages) from the builder stage
+COPY --from=builder $CONDA_DIR $CONDA_DIR
+
+# Copy the application code and your local files from the builder stage
+COPY --from=builder /app /app
+
+# Patch the hard-coded localhost binding for the llama.cpp backend to allow remote access
 RUN sed -i 's/127.0.0.1/0.0.0.0/g' /app/modules/llama_cpp_server.py
 
 # Expose the web interface/API port
@@ -67,5 +94,5 @@ EXPOSE 7860
 # Ensure the entrypoint script is executable
 RUN chmod +x /app/run.sh
 
-# Set the final startup script to run
+# Set the final startup script to run when the container starts on RunPod
 ENTRYPOINT ["/app/run.sh"]
