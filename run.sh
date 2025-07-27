@@ -4,8 +4,7 @@
 echo "----- Starting final run.sh at $(date) -----"
 
 # --- 1. Activate Conda Environment ---
-# --- CHANGE ---
-# Activate the environment from its new, isolated location.
+# Activate the environment from its new, isolated location
 source /opt/conda/etc/profile.d/conda.sh
 conda activate /opt/conda/envs/textgen
 
@@ -38,7 +37,6 @@ if [ -n "$NUM_EXPERTS_PER_TOKEN" ]; then
 fi
 
 # --- Networking ---
-# --- CHANGE ---
 # ADD --listen to bind the UI to 0.0.0.0 (making it accessible).
 # REMOVE --nowebui to ensure the web UI actually starts.
 CMD_ARGS_ARRAY+=(--listen)
