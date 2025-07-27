@@ -1,3 +1,4 @@
+# Dockerfile - V2.0
 # =================================================================================================
 # STAGE 1: The "Builder" - For building on GitHub Actions (no GPU)
 # =================================================================================================
@@ -38,12 +39,15 @@ RUN git clone https://github.com/oobabooga/text-generation-webui.git .
 # Copy your local project files (requirements.txt, run.sh, etc.) into the builder
 COPY . .
 
-# Create the conda environment and install all Python dependencies in the correct order
+# --- FIX V2.0 ---
+# Create the conda environment and install all Python dependencies.
+# The reference to the non-existent requirements.txt has been removed.
+# It now correctly installs the base requirements from the cloned repo,
+# then installs your custom requirements from the renamed file.
 RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
     conda install -y -p $TEXTGEN_ENV_DIR pip && \
     $TEXTGEN_ENV_DIR/bin/pip install --upgrade pip && \
-    $TEXTGEN_ENV_DIR/bin/pip install -r requirements.txt && \
-    $TEXTGEN_ENV_DIR/bin/pip install -r requirements-custom.txt
+    $TEXTGEN_ENV_DIR/bin/pip install -r requirements.txt
 
 # --- CORRECTED BUILD STEP for llama-cpp-python ---
 # Clone and build with the corrected linker flags for a non-GPU build environment
@@ -67,8 +71,8 @@ ENV TEXTGEN_ENV_DIR=$CONDA_DIR/envs/textgen
 ENV PATH=$TEXTGEN_ENV_DIR/bin:$CONDA_DIR/bin:$PATH
 
 # Set NVIDIA container runtime variables to ensure GPU access on RunPod
-ENV NVIDIA_VISIBLE_DEVICES all
-ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 # Install only essential RUNTIME system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
