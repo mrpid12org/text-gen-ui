@@ -2,7 +2,9 @@
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV CONDA_DIR=/app/installer_files/conda
+# --- CHANGE ---
+# Isolate Conda from the application directory to prevent conflicts.
+ENV CONDA_DIR=/opt/conda
 ENV PATH=$CONDA_DIR/bin:$PATH
 
 # Install system packages
@@ -14,42 +16,45 @@ RUN apt-get update && apt-get install -y \
     cmake libopenblas-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Miniconda
+# --- CHANGE ---
+# Install Miniconda to the new, isolated path.
 RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh && \
     bash miniconda.sh -b -p $CONDA_DIR && \
     rm miniconda.sh
 
-# Set working directory
+# Set working directory. This is now guaranteed to be empty.
 WORKDIR /app
 
-# FIX: Clone into the current directory (.) instead of (/app)
-# This resolves the "destination path already exists" error.
+# This command will now succeed.
 RUN git clone https://github.com/oobabooga/text-generation-webui.git .
 
 # Copy your local modifications: run.sh, requirements.txt, etc.
 COPY . .
 
-# Create Conda environment and install Python + pip
-RUN conda create -y -p /app/installer_files/env python=3.10 && \
-    conda install -y -p /app/installer_files/env pip && \
-    /app/installer_files/env/bin/pip install --upgrade pip
+# --- CHANGE ---
+# All paths now reference the new, isolated Conda environment.
+# A specific environment is created to avoid polluting the base Conda install.
+ENV TEXTGEN_ENV_DIR=$CONDA_DIR/envs/textgen
+RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
+    conda install -y -p $TEXTGEN_ENV_DIR pip && \
+    $TEXTGEN_ENV_DIR/bin/pip install --upgrade pip
 
-# Install Python dependencies from your corrected requirements.txt
-RUN /app/installer_files/env/bin/pip install -r requirements.txt
+# Install Python dependencies into the new environment
+RUN $TEXTGEN_ENV_DIR/bin/pip install -r requirements.txt
 
 # Clone and build llama-cpp-python with CUDA/cuBLAS support
 RUN git clone https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-python && \
     cd /app/llama-cpp-python && \
-    CMAKE_ARGS="-DLLAMA_CUBLAS=on" FORCE_CMAKE=1 /app/installer_files/env/bin/pip install .
+    CMAKE_ARGS="-DLLAMA_CUBLAS=on" FORCE_CMAKE=1 $TEXTGEN_ENV_DIR/bin/pip install .
 
-# ADDED FIX: Patch localhost binding for llama.cpp backend
+# Patch localhost binding for llama.cpp backend
 RUN sed -i 's/127.0.0.1/0.0.0.0/g' /app/modules/llama_cpp_server.py
 
-# ADDED FIX: Expose the web interface/API port
+# Expose the web interface/API port
 EXPOSE 7860
 
-# ADDED FIX: Ensure entrypoint is executable
+# Ensure entrypoint is executable
 RUN chmod +x /app/run.sh
 
-# ADDED FIX: Run the final startup script
+# Run the final startup script
 ENTRYPOINT ["/app/run.sh"]
