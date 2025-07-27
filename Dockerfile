@@ -1,4 +1,4 @@
-# Dockerfile - V1.8
+# Dockerfile - V1.9
 # Switch from the 'runtime' to the 'devel' image to include the full CUDA toolkit,
 # which is required to compile llama-cpp-python with GPU support.
 FROM nvidia/cuda:12.8.0-devel-ubuntu22.04
@@ -14,7 +14,6 @@ ENV CONDA_DIR=/opt/conda
 ENV PATH=$CONDA_DIR/bin:$PATH
 
 # Install system packages
-# --- FIX V1.8 (Addition) ---
 # Added libgomp1 to ensure the OpenMP library is available to the linker.
 RUN apt-get update && apt-get install -y \
     wget git curl vim unzip build-essential \
@@ -52,12 +51,12 @@ RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
 # Install Python dependencies from your requirements.txt
 RUN $TEXTGEN_ENV_DIR/bin/pip install -r requirements.txt
 
-# --- FIX V1.8 (Modification) ---
+# --- FIX V1.9 ---
 # Clone and build llama-cpp-python with CUDA/cuBLAS support
-# Added an explicit linker flag to tell CMake where to find the CUDA libraries.
+# Add LDFLAGS to explicitly tell the linker where to find the CUDA stub libraries.
 RUN git clone --recursive https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-python && \
     cd /app/llama-cpp-python && \
-    CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_LIBRARY=/usr/local/cuda/lib64" FORCE_CMAKE=1 $TEXTGEN_ENV_DIR/bin/pip install .
+    LDFLAGS="-L/usr/local/cuda/lib64/stubs" CMAKE_ARGS="-DGGML_CUDA=on" FORCE_CMAKE=1 $TEXTGEN_ENV_DIR/bin/pip install .
 
 # Patch the hard-coded localhost binding for the llama.cpp backend
 RUN sed -i 's/127.0.0.1/0.0.0.0/g' /app/modules/llama_cpp_server.py
