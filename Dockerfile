@@ -1,50 +1,45 @@
-# Use the correct NVIDIA CUDA runtime image for your hardware
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
-# --- DOCKERFILE VERSION: TGW-v49-DEFINITIVE ---
-
-# --- 1. Set Environment ---
 ENV DEBIAN_FRONTEND=noninteractive
+ENV CONDA_DIR=/app/installer_files/conda
+ENV PATH=$CONDA_DIR/bin:$PATH
 
-# --- 2. Switch to Bash Shell ---
-SHELL ["/bin/bash", "-c"]
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    wget git curl vim unzip build-essential \
+    python3 python3-pip python3-venv \
+    ca-certificates sudo software-properties-common \
+    libglib2.0-0 libsm6 libxrender1 libxext6 libgl1-mesa-glx \
+    && rm -rf /var/lib/apt/lists/*
 
-# --- 3. Install System Dependencies ---
-RUN rm -f /etc/apt/sources.list.d/cuda*.list && \
-    rm -rf /var/lib/apt/lists/* && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-    curl \
-    wget \
-    git \
-    git-lfs \
-    build-essential
+# Install Miniconda
+RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh && \
+    bash miniconda.sh -b -p $CONDA_DIR && \
+    rm miniconda.sh
 
-# --- 4. Clone Main Repo & Your Custom Extension ---
+# Set working directory
 WORKDIR /app
-ENV GIT_TERMINAL_PROMPT=0
-RUN git clone https://github.com/oobabooga/text-generation-webui.git .
-COPY deep_reason/ /app/extensions/deep_reason/
 
-# --- 5. Run Installer & Install Custom Wheel ---
-RUN \
-  GPU_CHOICE=E LAUNCH_AFTER_INSTALL=FALSE ./start_linux.sh && \
-  source /app/installer_files/conda/etc/profile.d/conda.sh && \
-  conda activate /app/installer_files/env && \
-  echo "Installing ExLlama2..." && \
-  pip install exllamav2
+# Clone TGW repo and patch it
+RUN git clone https://github.com/oobabooga/text-generation-webui.git /app
 
-# --- 6. Patch the Source Code ---
-# This is the definitive fix: change the hard-coded localhost address in the correct file.
-RUN sed -i "s/self.host = '127.0.0.1'/self.host = '0.0.0.0'/" modules/llama_cpp_server.py
+# Copy custom files (your model loader, run.sh, etc.)
+COPY . .
 
-# --- 7. Setup Persistence for Models ---
-RUN mkdir -p /workspace/models && rm -rf /app/models && ln -s /workspace/models /app/models
+# Create Conda environment and install Python packages
+RUN conda create -y -p /app/installer_files/env python=3.10 && \
+    conda install -y -p /app/installer_files/env pip && \
+    /app/installer_files/env/bin/pip install --upgrade pip && \
+    /app/installer_files/env/bin/pip install -r requirements.txt
 
-# --- 8. Copy run.sh ---
-COPY run.sh /app/run.sh
+# Critical patch for llama.cpp server binding
+RUN sed -i 's/127.0.0.1/0.0.0.0/g' /app/modules/llama_cpp_server.py
+
+# Permissions
 RUN chmod +x /app/run.sh
 
-# --- 9. Expose Port and Set Entrypoint ---
+# Expose the webui port
 EXPOSE 7860
-CMD ["/bin/bash", "run.sh"]
+
+# Set default entrypoint
+ENTRYPOINT ["/app/run.sh"]
