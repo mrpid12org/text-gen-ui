@@ -1,4 +1,4 @@
-# Dockerfile - V1.3
+# Dockerfile - V1.4
 # Use CUDA 12.8 runtime image as base
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
@@ -44,12 +44,12 @@ RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
 # Install Python dependencies from your requirements.txt
 RUN $TEXTGEN_ENV_DIR/bin/pip install -r requirements.txt
 
-# --- FIX V1.3 ---
+# --- FIX V1.4 ---
 # Clone and build llama-cpp-python with CUDA/cuBLAS support
-# The --recursive flag is added to ensure git submodules are downloaded.
+# The build flag has been updated from LLAMA_CUBLAS to GGML_CUDA.
 RUN git clone --recursive https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-python && \
     cd /app/llama-cpp-python && \
-    CMAKE_ARGS="-DLLAMA_CUBLAS=on" FORCE_CMAKE=1 $TEXTGEN_ENV_DIR/bin/pip install .
+    CMAKE_ARGS="-DGGML_CUDA=on" FORCE_CMAKE=1 $TEXTGEN_ENV_DIR/bin/pip install .
 
 # Patch the hard-coded localhost binding for the llama.cpp backend
 RUN sed -i 's/127.0.0.1/0.0.0.0/g' /app/modules/llama_cpp_server.py
