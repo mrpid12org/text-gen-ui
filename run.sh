@@ -1,5 +1,5 @@
 #!/bin/bash
-# TGW RUN.SH v49 - FINAL
+# TGW RUN.SH v49 - DEFINITIVE
 
 echo "----- Starting final run.sh at $(date) -----"
 
