@@ -1,3 +1,4 @@
+# docker-build.yml - V1.1
 name: Docker Build and Push
 
 on:
@@ -25,6 +26,5 @@ jobs:
           context: .
           push: true
           tags: sjpgwh/text-gen-ui:latest
-          # --- THIS IS THE FIX ---
-          # Add this line to disable the build cache
-          no-cache: true
+          # --- CHANGE V1.1 ---
+          # no-cache flag removed as requested for faster builds.
