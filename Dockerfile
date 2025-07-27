@@ -1,7 +1,7 @@
 # Use the correct NVIDIA CUDA runtime image for your hardware
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
-# --- DOCKERFILE VERSION: TGW-v47-PATCHED ---
+# --- DOCKERFILE VERSION: TGW-v48-FINAL ---
 
 # --- 1. Set Environment ---
 ENV DEBIAN_FRONTEND=noninteractive
@@ -36,7 +36,7 @@ RUN \
 
 # --- 6. Patch the Source Code ---
 # This is the definitive fix: change the hard-coded localhost address.
-RUN sed -i "s/'--host', '127.0.0.1'/'--host', '0.0.0.0'/" modules/models.py
+RUN sed -i 's/127\.0\.0\.1/0.0.0.0/g' modules/models.py
 
 # --- 7. Setup Persistence for Models ---
 RUN mkdir -p /workspace/models && rm -rf /app/models && ln -s /workspace/models /app/models
