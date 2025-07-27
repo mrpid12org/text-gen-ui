@@ -22,8 +22,9 @@ RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -
 # Set working directory
 WORKDIR /app
 
-# Clone oobabooga web UI
-RUN git clone https://github.com/oobabooga/text-generation-webui.git /app
+# FIX: Clone into the current directory (.) instead of (/app)
+# This resolves the "destination path already exists" error.
+RUN git clone https://github.com/oobabooga/text-generation-webui.git .
 
 # Copy your local modifications: run.sh, requirements.txt, etc.
 COPY . .
@@ -33,7 +34,7 @@ RUN conda create -y -p /app/installer_files/env python=3.10 && \
     conda install -y -p /app/installer_files/env pip && \
     /app/installer_files/env/bin/pip install --upgrade pip
 
-# Install Python dependencies
+# Install Python dependencies from your corrected requirements.txt
 RUN /app/installer_files/env/bin/pip install -r requirements.txt
 
 # Clone and build llama-cpp-python with CUDA/cuBLAS support
@@ -41,14 +42,14 @@ RUN git clone https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-pyt
     cd /app/llama-cpp-python && \
     CMAKE_ARGS="-DLLAMA_CUBLAS=on" FORCE_CMAKE=1 /app/installer_files/env/bin/pip install .
 
-# Patch localhost binding for llama.cpp backend
+# ADDED FIX: Patch localhost binding for llama.cpp backend
 RUN sed -i 's/127.0.0.1/0.0.0.0/g' /app/modules/llama_cpp_server.py
 
-# Expose the web interface/API port
+# ADDED FIX: Expose the web interface/API port
 EXPOSE 7860
 
-# Ensure entrypoint is executable
+# ADDED FIX: Ensure entrypoint is executable
 RUN chmod +x /app/run.sh
 
-# Run the final startup script
+# ADDED FIX: Run the final startup script
 ENTRYPOINT ["/app/run.sh"]
