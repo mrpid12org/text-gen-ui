@@ -1,7 +1,7 @@
 # Use the correct NVIDIA CUDA runtime image for your hardware
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
-# --- DOCKERFILE VERSION: TGW-v49-FINAL ---
+# --- DOCKERFILE VERSION: TGW-v49-DEFINITIVE ---
 
 # --- 1. Set Environment ---
 ENV DEBIAN_FRONTEND=noninteractive
