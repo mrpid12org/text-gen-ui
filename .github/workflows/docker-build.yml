@@ -1,36 +1,30 @@
 name: Docker Build and Push
 
-# This section defines when the workflow runs
 on:
-  # This trigger runs the workflow on any push to the "main" branch
   push:
     branches: [ "main" ]
-  
-  # --- THIS IS THE FIX ---
-  # This trigger adds a button in the Actions tab to manually run the workflow
   workflow_dispatch:
 
 jobs:
   build:
-    # This tells the job to run on your self-hosted runner
     runs-on: self-hosted
 
     steps:
-      # 1. Checks out a copy of your repository on the runner
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Logs into your container registry (e.g., Docker Hub)
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 3. Builds the Docker image from your Dockerfile and pushes it to the registry
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: sjpgwh/text-gen-ui:latest
+          # --- THIS IS THE FIX ---
+          # Add this line to disable the build cache
+          no-cache: true
