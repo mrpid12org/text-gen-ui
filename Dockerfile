@@ -1,6 +1,8 @@
-# Dockerfile - V1.4
-# Use CUDA 12.8 runtime image as base
-FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
+# Dockerfile - V1.5
+# --- FIX V1.5 ---
+# Switch from the 'runtime' to the 'devel' image to include the full CUDA toolkit,
+# which is required to compile llama-cpp-python with GPU support.
+FROM nvidia/cuda:12.8.0-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 # Isolate Conda from the application directory to prevent conflicts
@@ -44,7 +46,6 @@ RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
 # Install Python dependencies from your requirements.txt
 RUN $TEXTGEN_ENV_DIR/bin/pip install -r requirements.txt
 
-# --- FIX V1.4 ---
 # Clone and build llama-cpp-python with CUDA/cuBLAS support
 # The build flag has been updated from LLAMA_CUBLAS to GGML_CUDA.
 RUN git clone --recursive https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-python && \
