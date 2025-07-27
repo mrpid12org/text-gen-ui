@@ -1,4 +1,4 @@
-# Dockerfile - V1.2
+# Dockerfile - V1.3
 # Use CUDA 12.8 runtime image as base
 FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
 
@@ -21,7 +21,6 @@ RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -
     bash miniconda.sh -b -p $CONDA_DIR && \
     rm miniconda.sh
 
-# --- FIX V1.2 ---
 # Accept Anaconda Terms of Service for the specific default channels.
 RUN conda config --set auto_update_conda false && \
     conda tos accept --channel https://repo.anaconda.com/pkgs/main && \
@@ -45,8 +44,10 @@ RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
 # Install Python dependencies from your requirements.txt
 RUN $TEXTGEN_ENV_DIR/bin/pip install -r requirements.txt
 
+# --- FIX V1.3 ---
 # Clone and build llama-cpp-python with CUDA/cuBLAS support
-RUN git clone https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-python && \
+# The --recursive flag is added to ensure git submodules are downloaded.
+RUN git clone --recursive https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-python && \
     cd /app/llama-cpp-python && \
     CMAKE_ARGS="-DLLAMA_CUBLAS=on" FORCE_CMAKE=1 $TEXTGEN_ENV_DIR/bin/pip install .
 
