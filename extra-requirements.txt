@@ -1,6 +1,4 @@
-gradio
-numpy
+# Custom additions for this project
 uvicorn
 fastapi
 markdown
-Pillow
