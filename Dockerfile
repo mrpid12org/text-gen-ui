@@ -45,13 +45,12 @@ RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
     $TEXTGEN_ENV_DIR/bin/pip install -r requirements.txt
 
 # --- CORRECTED BUILD STEP for llama-cpp-python ---
-# Build for multiple architectures (Ampere 8.0, Ada 8.9, Blackwell 10.0)
-# and link against CUDA stubs for a portable build.
+# Build for multiple architectures and link against CUDA stubs.
 RUN git clone --recursive https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-python && \
     cd /app/llama-cpp-python && \
-    export CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=80;89;100" && \
-    export FORCE_CMAKE=1 && \
-    export LDFLAGS="-L/usr/local/cuda/lib64/stubs -Wl,-rpath-link,/usr/local/cuda/lib64/stubs" && \
+    CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES='80;89;100'" \
+    FORCE_CMAKE=1 \
+    LDFLAGS="-L/usr/local/cuda/lib64/stubs" \
     $TEXTGEN_ENV_DIR/bin/pip install .
 
 # =================================================================================================
