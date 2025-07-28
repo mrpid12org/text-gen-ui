@@ -1,4 +1,4 @@
-# Dockerfile - V5.3 (Final Corrected Version)
+# Dockerfile - V5.4 (Separated Dependencies)
 # =================================================================================================
 # STAGE 1: The "Builder" - For building on GitHub Actions (no GPU)
 # =================================================================================================
@@ -33,15 +33,22 @@ RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -
 # Set the working directory for the application
 WORKDIR /app
 
-# Clone the web UI repository
+# Clone the web UI repository. This includes the original requirements.txt
 RUN git clone https://github.com/oobabooga/text-generation-webui.git .
-# Copy your local project files (requirements.txt, run.sh, etc.) into the builder
-COPY . .
+
+# Copy your custom files into the correct locations
+COPY run.sh .
+COPY extra-requirements.txt .
+COPY deep_reason ./extensions/deep_reason
+
 # Create the conda environment and install all Python dependencies.
 RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
     conda install -y -p $TEXTGEN_ENV_DIR pip && \
     $TEXTGEN_ENV_DIR/bin/pip install --upgrade pip && \
-    $TEXTGEN_ENV_DIR/bin/pip install -r requirements.txt
+    # Install from the original requirements file cloned from the repo
+    $TEXTGEN_ENV_DIR/bin/pip install -r requirements.txt && \
+    # Install your extra requirements from your custom file
+    $TEXTGEN_ENV_DIR/bin/pip install -r extra-requirements.txt
 
 # --- CORRECTED BUILD STEP for llama-cpp-python ---
 # Use a setup.cfg file to pass CMake flags robustly, avoiding shell escaping issues.
