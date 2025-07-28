@@ -1,4 +1,4 @@
-# docker-build.yml - V1.5 (Final, with Smart Pre-Build Cleanup)
+# docker-build.yml - V1.6 (Final, with Resource Monitoring)
 name: Docker Build and Push
 
 on:
@@ -8,23 +8,21 @@ on:
 
 jobs:
   build:
-    # Your self-hosted runner configuration is preserved.
     runs-on: self-hosted
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Selectively frees up disk space on the runner BEFORE the build.
-      # This preserves the Docker cache for faster builds and now works without a password prompt.
-      - name: Free up disk space on runner
+      - name: Free up disk space and check initial state
         run: |
           echo "--- Freeing up disk space by removing large, unused toolsets... ---"
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
           sudo rm -rf /usr/local/share/boost
-          echo "--- Disk space after selective cleanup: ---"
+          echo "--- Initial Disk and Docker Space ---"
           df -h .
+          docker system df
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -33,15 +31,33 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: sjpgwh/text-gen-ui:latest
 
-      # Optional but recommended: A final prune AFTER the build to keep the runner tidy for the future.
+      - name: Check peak resource usage
+        if: always()
+        run: |
+          echo "--- Peak Disk and Docker Space (after build, before cleanup) ---"
+          df -h .
+          docker system df
+          echo "--- Peak CPU Load (5-second average during build) ---"
+          # This command might require installing sysstat: sudo apt-get update && sudo apt-get install -y sysstat
+          if command -v mpstat &> /dev/null
+          then
+            mpstat 5 1
+          else
+            echo "mpstat not found. To install it, run: sudo apt-get update && sudo apt-get install -y sysstat"
+            top -b -n 1 | head -n 5
+          fi
+
       - name: Clean up Docker resources after build
         if: always()
         run: |
-          echo "--- Cleaning up Docker resources on self-hosted runner... ---"
+          echo "--- Cleaning up Docker resources... ---"
           docker system prune -f
+          echo "--- Final Disk Space (after cleanup) ---"
+          df -h .
