@@ -1,4 +1,4 @@
-# docker-build.yml - V1.6 (Final, with Resource Monitoring)
+# docker-build.yml - V1.7 (Final, with Monitoring Tools Installed)
 name: Docker Build and Push
 
 on:
@@ -14,8 +14,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Free up disk space and check initial state
+      - name: Free up disk space and install monitoring tools
         run: |
+          echo "--- Installing sysstat for mpstat monitoring... ---"
+          sudo apt-get update && sudo apt-get install -y sysstat
           echo "--- Freeing up disk space by removing large, unused toolsets... ---"
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
@@ -45,14 +47,7 @@ jobs:
           df -h .
           docker system df
           echo "--- Peak CPU Load (5-second average during build) ---"
-          # This command might require installing sysstat: sudo apt-get update && sudo apt-get install -y sysstat
-          if command -v mpstat &> /dev/null
-          then
-            mpstat 5 1
-          else
-            echo "mpstat not found. To install it, run: sudo apt-get update && sudo apt-get install -y sysstat"
-            top -b -n 1 | head -n 5
-          fi
+          mpstat 5 1
 
       - name: Clean up Docker resources after build
         if: always()
