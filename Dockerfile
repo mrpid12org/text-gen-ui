@@ -1,4 +1,4 @@
-# Dockerfile - V3.0
+# Dockerfile - V4.0 (Final)
 # =================================================================================================
 # STAGE 1: The "Builder" - For building on GitHub Actions (no GPU)
 # =================================================================================================
@@ -45,15 +45,12 @@ RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
     $TEXTGEN_ENV_DIR/bin/pip install -r requirements.txt
 
 # --- CORRECTED BUILD STEP for llama-cpp-python ---
-# Use ENV to set the build arguments for all subsequent commands.
-ENV CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=80;89;100"
-ENV FORCE_CMAKE=1
-ENV LDFLAGS="-L/usr/local/cuda/lib64/stubs"
-
-# Clone and build with the corrected environment variables.
+# This command directly configures the pip build process with all necessary flags.
 RUN git clone --recursive https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-python && \
     cd /app/llama-cpp-python && \
-    $TEXTGEN_ENV_DIR/bin/pip install .
+    $TEXTGEN_ENV_DIR/bin/pip install . \
+        --config-settings=cmake.args="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=80;89;100" \
+        --config-settings=cmake.define.CMAKE_EXE_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda"
 
 # =================================================================================================
 # STAGE 2: The "Final" Image - For running on RunPod (with GPU)
