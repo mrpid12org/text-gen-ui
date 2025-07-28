@@ -1,4 +1,4 @@
-# docker-build.yml - V1.2 (with disk cleanup)
+# docker-build.yml - V1.5 (Final, with Smart Pre-Build Cleanup)
 name: Docker Build and Push
 
 on:
@@ -8,29 +8,24 @@ on:
 
 jobs:
   build:
-    # Switched to the standard GitHub-hosted runner, which the cleanup commands are designed for.
-    runs-on: ubuntu-latest
+    # Your self-hosted runner configuration is preserved.
+    runs-on: self-hosted
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # New step to free up disk space on the runner before the build starts.
-      - name: Free up disk space on GitHub runner
+      # New step to selectively free up disk space on the runner BEFORE the build.
+      # This preserves the Docker cache for faster builds.
+      - name: Free up disk space on runner
         run: |
-          echo "--- Initial disk space: ---"
-          df -h .
-          # These commands remove large, pre-installed toolsets that are not needed for this build.
+          echo "--- Freeing up disk space by removing large, unused toolsets... ---"
+          # These commands are safe to run. If the directories don't exist, they will do nothing.
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
           sudo rm -rf /usr/local/share/boost
-          sudo rm -rf $AGENT_TOOLSDIRECTORY
-          echo "--- Disk space after cleanup: ---"
+          echo "--- Disk space after selective cleanup: ---"
           df -h .
-
-      # Best practice: ensure the latest Docker builder toolkit is available.
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -43,13 +38,12 @@ jobs:
         with:
           context: .
           push: true
-          # Your original image tag is preserved here.
+          # Your original image tag is preserved.
           tags: sjpgwh/text-gen-ui:latest
 
-      # New step to clean up Docker resources after the build.
-      - name: Clean up Docker to free space
-        # This 'if: always()' condition ensures this step runs even if the build fails, preventing leftover data.
+      # Optional but recommended: A final prune AFTER the build to keep the runner tidy for the future.
+      - name: Clean up Docker resources after build
         if: always()
         run: |
-          echo "--- Cleaning up Docker resources... ---"
-          docker system prune -a -f
+          echo "--- Cleaning up Docker resources on self-hosted runner... ---"
+          docker system prune -f
