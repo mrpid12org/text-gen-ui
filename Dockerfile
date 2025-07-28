@@ -1,4 +1,4 @@
-# Dockerfile - V2.1
+# Dockerfile - V2.2
 # =================================================================================================
 # STAGE 1: The "Builder" - For building on GitHub Actions (no GPU)
 # =================================================================================================
@@ -37,11 +37,8 @@ WORKDIR /app
 RUN git clone https://github.com/oobabooga/text-generation-webui.git .
 # Copy your local project files (requirements.txt, run.sh, etc.) into the builder
 COPY . .
-# --- FIX V2.1 ---
+
 # Create the conda environment and install all Python dependencies.
-# The reference to the non-existent requirements.txt has been removed.
-# It now correctly installs the base requirements from the cloned repo,
-# then installs your custom requirements from the renamed file.
 RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
     conda install -y -p $TEXTGEN_ENV_DIR pip && \
     $TEXTGEN_ENV_DIR/bin/pip install --upgrade pip && \
@@ -51,7 +48,9 @@ RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
 # Clone and build with the corrected linker flags for a non-GPU build environment
 RUN git clone --recursive https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-python && \
     cd /app/llama-cpp-python && \
-    LDFLAGS="-L/usr/local/cuda/lib64 -Wl,-rpath-link,/usr/local/cuda/lib64" \
+    # --- FIX V2.2 ---
+    # Point the linker to the CUDA stubs to resolve the missing libcuda.so.1 error
+    LDFLAGS="-L/usr/local/cuda/lib64/stubs" \
     CMAKE_ARGS="-DGGML_CUDA=on" \
     FORCE_CMAKE=1 \
     $TEXTGEN_ENV_DIR/bin/pip install .
