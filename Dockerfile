@@ -1,4 +1,4 @@
-# Dockerfile - V2.2
+# Dockerfile - V2.3
 # =================================================================================================
 # STAGE 1: The "Builder" - For building on GitHub Actions (no GPU)
 # =================================================================================================
@@ -48,9 +48,9 @@ RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
 # Clone and build with the corrected linker flags for a non-GPU build environment
 RUN git clone --recursive https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-python && \
     cd /app/llama-cpp-python && \
-    # --- FIX V2.2 ---
-    # Point the linker to the CUDA stubs to resolve the missing libcuda.so.1 error
-    LDFLAGS="-L/usr/local/cuda/lib64/stubs" \
+    # --- FIX V2.3 ---
+    # Point the linker to the CUDA stubs using both -L and -rpath-link to satisfy all dependencies.
+    LDFLAGS="-L/usr/local/cuda/lib64/stubs -Wl,-rpath-link,/usr/local/cuda/lib64/stubs" \
     CMAKE_ARGS="-DGGML_CUDA=on" \
     FORCE_CMAKE=1 \
     $TEXTGEN_ENV_DIR/bin/pip install .
