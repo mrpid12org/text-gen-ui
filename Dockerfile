@@ -1,4 +1,4 @@
-# Dockerfile - V5.1 (Final)
+# Dockerfile - V5.3 (Final Corrected Version)
 # =================================================================================================
 # STAGE 1: The "Builder" - For building on GitHub Actions (no GPU)
 # =================================================================================================
@@ -37,7 +37,6 @@ WORKDIR /app
 RUN git clone https://github.com/oobabooga/text-generation-webui.git .
 # Copy your local project files (requirements.txt, run.sh, etc.) into the builder
 COPY . .
-
 # Create the conda environment and install all Python dependencies.
 RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
     conda install -y -p $TEXTGEN_ENV_DIR pip && \
@@ -45,14 +44,13 @@ RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
     $TEXTGEN_ENV_DIR/bin/pip install -r requirements.txt
 
 # --- CORRECTED BUILD STEP for llama-cpp-python ---
-# Use bash -c to ensure correct parsing of escaped semicolons.
-RUN bash -c '\
-  git clone --recursive https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-python && \
-  cd /app/llama-cpp-python && \
-  $TEXTGEN_ENV_DIR/bin/pip install . \
-    --config-settings=cmake.args="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=80\;89\;100" \
-    --config-settings=cmake.define.CMAKE_EXE_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda" \
-'
+# Use a setup.cfg file to pass CMake flags robustly, avoiding shell escaping issues.
+RUN git clone --recursive https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-python && \
+    cd /app/llama-cpp-python && \
+    echo "[build-system]" > setup.cfg && \
+    echo "cmake-args = -DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=80;89;100" >> setup.cfg && \
+    echo "cmake-exe-linker-flags = -L/usr/local/cuda/lib64/stubs -lcuda" >> setup.cfg && \
+    $TEXTGEN_ENV_DIR/bin/pip install .
 
 # =================================================================================================
 # STAGE 2: The "Final" Image - For running on RunPod (with GPU)
