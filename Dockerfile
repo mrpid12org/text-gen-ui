@@ -1,4 +1,4 @@
-# Dockerfile - V4.1 (Final)
+# Dockerfile - V4.2 (Final)
 # =================================================================================================
 # STAGE 1: The "Builder" - For building on GitHub Actions (no GPU)
 # =================================================================================================
@@ -78,10 +78,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy the fully configured Conda environment (with all packages) from the builder stage
-COPY --from-builder $CONDA_DIR $CONDA_DIR
+COPY --from=builder $CONDA_DIR $CONDA_DIR
 
 # Copy the application code and your local files from the builder stage
-COPY --from-builder /app /app
+COPY --from=builder /app /app
 
 # Patch the hard-coded localhost binding for the llama.cpp backend to allow remote access
 RUN sed -i 's/127.0.0.1/0.0.0.0/g' /app/modules/llama_cpp_server.py
