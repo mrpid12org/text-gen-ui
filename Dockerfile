@@ -1,4 +1,4 @@
-# Dockerfile - V5.8 (Final, Corrected Requirements Path)
+# Dockerfile - V5.9 (Final, Correct llama.cpp install)
 # =================================================================================================
 # STAGE 1: The "Builder" - For building on GitHub Actions (no GPU)
 # =================================================================================================
@@ -50,14 +50,12 @@ RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
 RUN $TEXTGEN_ENV_DIR/bin/pip install -r requirements/full/requirements_cuda128.txt
 RUN $TEXTGEN_ENV_DIR/bin/pip install -r extra-requirements.txt
 
-# --- CORRECTED BUILD STEP for llama-cpp-python ---
-# Use a setup.cfg file to pass CMake flags robustly, avoiding shell escaping issues.
-RUN git clone --recursive https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-python && \
-    cd /app/llama-cpp-python && \
-    echo "[build-system]" > setup.cfg && \
-    echo "cmake-args = -DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=80;89;100" >> setup.cfg && \
-    echo "cmake-exe-linker-flags = -L/usr/local/cuda/lib64/stubs -lcuda" >> setup.cfg && \
-    $TEXTGEN_ENV_DIR/bin/pip install .
+# --- THE CORRECT FIX for llama-cpp-python ---
+# Explicitly install the llama-cpp-python package with the correct CUDA support.
+# This will pull in the necessary 'llama_cpp_binaries' as a dependency.
+# The CMAKE_ARGS environment variable ensures it builds against the correct CUDA architecture.
+RUN CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=80;89;100" \
+    $TEXTGEN_ENV_DIR/bin/pip install llama-cpp-python --no-cache-dir
 
 # =================================================================================================
 # STAGE 2: The "Final" Image - For running on RunPod (with GPU)
