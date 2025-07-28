@@ -1,4 +1,4 @@
-# Dockerfile - V5.6 (Final, Robust Build)
+# Dockerfile - V5.8 (Final, Corrected Requirements Path)
 # =================================================================================================
 # STAGE 1: The "Builder" - For building on GitHub Actions (no GPU)
 # =================================================================================================
@@ -33,7 +33,7 @@ RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -
 # Set the working directory for the application
 WORKDIR /app
 
-# Clone the web UI repository into the current directory. The '.' is crucial.
+# Clone the web UI repository into the current directory.
 RUN git clone https://github.com/oobabooga/text-generation-webui.git .
 
 # Copy your custom files into the correct locations
@@ -41,16 +41,13 @@ COPY run.sh .
 COPY extra-requirements.txt .
 COPY deep_reason ./extensions/deep_reason
 
-# --- Create Conda environment and install dependencies in separate steps ---
+# Create Conda environment and install dependencies
 RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
     conda install -y -p $TEXTGEN_ENV_DIR pip && \
     $TEXTGEN_ENV_DIR/bin/pip install --upgrade pip
 
-# --- Debugging: Check for requirements.txt before trying to use it ---
-RUN echo "--- File list before installing requirements: ---" && ls -la
-
-# Install from the original requirements file, then your extra requirements
-RUN $TEXTGEN_ENV_DIR/bin/pip install -r requirements.txt
+# Install from the specific CUDA 12.8 requirements file, then your extras
+RUN $TEXTGEN_ENV_DIR/bin/pip install -r requirements/full/requirements_cuda128.txt
 RUN $TEXTGEN_ENV_DIR/bin/pip install -r extra-requirements.txt
 
 # --- CORRECTED BUILD STEP for llama-cpp-python ---
