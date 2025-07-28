@@ -1,4 +1,4 @@
-# docker-build.yml - V1.1
+# docker-build.yml - V1.2 (with disk cleanup)
 name: Docker Build and Push
 
 on:
@@ -8,11 +8,29 @@ on:
 
 jobs:
   build:
-    runs-on: self-hosted
+    # Switched to the standard GitHub-hosted runner, which the cleanup commands are designed for.
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # New step to free up disk space on the runner before the build starts.
+      - name: Free up disk space on GitHub runner
+        run: |
+          echo "--- Initial disk space: ---"
+          df -h .
+          # These commands remove large, pre-installed toolsets that are not needed for this build.
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf $AGENT_TOOLSDIRECTORY
+          echo "--- Disk space after cleanup: ---"
+          df -h .
+
+      # Best practice: ensure the latest Docker builder toolkit is available.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -25,6 +43,13 @@ jobs:
         with:
           context: .
           push: true
+          # Your original image tag is preserved here.
           tags: sjpgwh/text-gen-ui:latest
-          # --- CHANGE V1.1 ---
-          # no-cache flag removed as requested for faster builds.
+
+      # New step to clean up Docker resources after the build.
+      - name: Clean up Docker to free space
+        # This 'if: always()' condition ensures this step runs even if the build fails, preventing leftover data.
+        if: always()
+        run: |
+          echo "--- Cleaning up Docker resources... ---"
+          docker system prune -a -f
