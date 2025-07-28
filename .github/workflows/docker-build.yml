@@ -15,12 +15,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # New step to selectively free up disk space on the runner BEFORE the build.
-      # This preserves the Docker cache for faster builds.
+      # Selectively frees up disk space on the runner BEFORE the build.
+      # This preserves the Docker cache for faster builds and now works without a password prompt.
       - name: Free up disk space on runner
         run: |
           echo "--- Freeing up disk space by removing large, unused toolsets... ---"
-          # These commands are safe to run. If the directories don't exist, they will do nothing.
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
           sudo rm -rf /usr/local/share/boost
@@ -38,7 +37,6 @@ jobs:
         with:
           context: .
           push: true
-          # Your original image tag is preserved.
           tags: sjpgwh/text-gen-ui:latest
 
       # Optional but recommended: A final prune AFTER the build to keep the runner tidy for the future.
