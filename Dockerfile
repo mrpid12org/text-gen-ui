@@ -1,4 +1,4 @@
-# Dockerfile - V5.5 (Final and Verified)
+# Dockerfile - V5.6 (Final, Robust Build)
 # =================================================================================================
 # STAGE 1: The "Builder" - For building on GitHub Actions (no GPU)
 # =================================================================================================
@@ -36,22 +36,22 @@ WORKDIR /app
 # Clone the web UI repository into the current directory. The '.' is crucial.
 RUN git clone https://github.com/oobabooga/text-generation-webui.git .
 
-# --- (Optional) Add a line for debugging to see the files ---
-RUN ls -la
-
 # Copy your custom files into the correct locations
 COPY run.sh .
 COPY extra-requirements.txt .
 COPY deep_reason ./extensions/deep_reason
 
-# Create the conda environment and install all Python dependencies.
+# --- Create Conda environment and install dependencies in separate steps ---
 RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
     conda install -y -p $TEXTGEN_ENV_DIR pip && \
-    $TEXTGEN_ENV_DIR/bin/pip install --upgrade pip && \
-    # Install from the original requirements file cloned from the repo
-    $TEXTGEN_ENV_DIR/bin/pip install -r requirements.txt && \
-    # Install your extra requirements from your custom file
-    $TEXTGEN_ENV_DIR/bin/pip install -r extra-requirements.txt
+    $TEXTGEN_ENV_DIR/bin/pip install --upgrade pip
+
+# --- Debugging: Check for requirements.txt before trying to use it ---
+RUN echo "--- File list before installing requirements: ---" && ls -la
+
+# Install from the original requirements file, then your extra requirements
+RUN $TEXTGEN_ENV_DIR/bin/pip install -r requirements.txt
+RUN $TEXTGEN_ENV_DIR/bin/pip install -r extra-requirements.txt
 
 # --- CORRECTED BUILD STEP for llama-cpp-python ---
 # Use a setup.cfg file to pass CMake flags robustly, avoiding shell escaping issues.
