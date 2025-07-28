@@ -1,5 +1,6 @@
-# Corrected requirements.txt
 gradio
 numpy
 uvicorn
 fastapi
+markdown
+Pillow
