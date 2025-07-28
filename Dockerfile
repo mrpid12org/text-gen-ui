@@ -1,4 +1,4 @@
-# Dockerfile - V4.0 (Final)
+# Dockerfile - V4.1 (Final)
 # =================================================================================================
 # STAGE 1: The "Builder" - For building on GitHub Actions (no GPU)
 # =================================================================================================
@@ -49,8 +49,8 @@ RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
 RUN git clone --recursive https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-python && \
     cd /app/llama-cpp-python && \
     $TEXTGEN_ENV_DIR/bin/pip install . \
-        --config-settings=cmake.args="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=80;89;100" \
-        --config-settings=cmake.define.CMAKE_EXE_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda"
+        --config-settings="cmake.args=-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=80;89;100" \
+        --config-settings="cmake.define.CMAKE_EXE_LINKER_FLAGS=-L/usr/local/cuda/lib64/stubs -lcuda"
 
 # =================================================================================================
 # STAGE 2: The "Final" Image - For running on RunPod (with GPU)
@@ -78,10 +78,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy the fully configured Conda environment (with all packages) from the builder stage
-COPY --from=builder $CONDA_DIR $CONDA_DIR
+COPY --from-builder $CONDA_DIR $CONDA_DIR
 
 # Copy the application code and your local files from the builder stage
-COPY --from=builder /app /app
+COPY --from-builder /app /app
 
 # Patch the hard-coded localhost binding for the llama.cpp backend to allow remote access
 RUN sed -i 's/127.0.0.1/0.0.0.0/g' /app/modules/llama_cpp_server.py
