@@ -1,4 +1,4 @@
-# Dockerfile - V5.9 (Final, Correct llama.cpp install)
+# Dockerfile - V6.0 (Final, Upgraded to Python 3.11)
 # =================================================================================================
 # STAGE 1: The "Builder" - For building on GitHub Actions (no GPU)
 # =================================================================================================
@@ -41,8 +41,8 @@ COPY run.sh .
 COPY extra-requirements.txt .
 COPY deep_reason ./extensions/deep_reason
 
-# Create Conda environment and install dependencies
-RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
+# Create Conda environment with Python 3.11 and install dependencies
+RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.11 && \
     conda install -y -p $TEXTGEN_ENV_DIR pip && \
     $TEXTGEN_ENV_DIR/bin/pip install --upgrade pip
 
@@ -50,10 +50,7 @@ RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
 RUN $TEXTGEN_ENV_DIR/bin/pip install -r requirements/full/requirements_cuda128.txt
 RUN $TEXTGEN_ENV_DIR/bin/pip install -r extra-requirements.txt
 
-# --- THE CORRECT FIX for llama-cpp-python ---
-# Explicitly install the llama-cpp-python package with the correct CUDA support.
-# This will pull in the necessary 'llama_cpp_binaries' as a dependency.
-# The CMAKE_ARGS environment variable ensures it builds against the correct CUDA architecture.
+# Install llama-cpp-python, building it against our specific CUDA version
 RUN CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=80;89;100" \
     $TEXTGEN_ENV_DIR/bin/pip install llama-cpp-python --no-cache-dir
 
