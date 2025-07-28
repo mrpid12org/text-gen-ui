@@ -1,4 +1,4 @@
-# Dockerfile - V6.0 (Final, Upgraded to Python 3.11)
+# Dockerfile - V6.1 (Final, with Linker Fix)
 # =================================================================================================
 # STAGE 1: The "Builder" - For building on GitHub Actions (no GPU)
 # =================================================================================================
@@ -50,8 +50,9 @@ RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.11 && \
 RUN $TEXTGEN_ENV_DIR/bin/pip install -r requirements/full/requirements_cuda128.txt
 RUN $TEXTGEN_ENV_DIR/bin/pip install -r extra-requirements.txt
 
-# Install llama-cpp-python, building it against our specific CUDA version
+# Install llama-cpp-python, telling the linker where to find the CUDA libraries.
 RUN CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=80;89;100" \
+    LDFLAGS="-L/usr/local/cuda/lib64/stubs" \
     $TEXTGEN_ENV_DIR/bin/pip install llama-cpp-python --no-cache-dir
 
 # =================================================================================================
