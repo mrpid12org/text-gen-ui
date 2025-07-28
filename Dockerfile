@@ -1,4 +1,4 @@
-# Dockerfile - V5.0 (Final)
+# Dockerfile - V5.1 (Final)
 # =================================================================================================
 # STAGE 1: The "Builder" - For building on GitHub Actions (no GPU)
 # =================================================================================================
@@ -45,13 +45,14 @@ RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.10 && \
     $TEXTGEN_ENV_DIR/bin/pip install -r requirements.txt
 
 # --- CORRECTED BUILD STEP for llama-cpp-python ---
-# This command directly configures the pip build process with all necessary flags,
-# including escaped semicolons for the CUDA architectures list.
-RUN git clone --recursive https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-python && \
-    cd /app/llama-cpp-python && \
-    $TEXTGEN_ENV_DIR/bin/pip install . \
-        --config-settings=cmake.args="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=80\;89\;100" \
-        --config-settings=cmake.define.CMAKE_EXE_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda"
+# Use bash -c to ensure correct parsing of escaped semicolons.
+RUN bash -c '\
+  git clone --recursive https://github.com/abetlen/llama-cpp-python.git /app/llama-cpp-python && \
+  cd /app/llama-cpp-python && \
+  $TEXTGEN_ENV_DIR/bin/pip install . \
+    --config-settings=cmake.args="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=80\;89\;100" \
+    --config-settings=cmake.define.CMAKE_EXE_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs -lcuda" \
+'
 
 # =================================================================================================
 # STAGE 2: The "Final" Image - For running on RunPod (with GPU)
