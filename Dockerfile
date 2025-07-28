@@ -1,4 +1,4 @@
-# Dockerfile - V5.4 (Separated Dependencies)
+# Dockerfile - V5.5 (Final and Verified)
 # =================================================================================================
 # STAGE 1: The "Builder" - For building on GitHub Actions (no GPU)
 # =================================================================================================
@@ -33,8 +33,11 @@ RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -
 # Set the working directory for the application
 WORKDIR /app
 
-# Clone the web UI repository. This includes the original requirements.txt
+# Clone the web UI repository into the current directory. The '.' is crucial.
 RUN git clone https://github.com/oobabooga/text-generation-webui.git .
+
+# --- (Optional) Add a line for debugging to see the files ---
+RUN ls -la
 
 # Copy your custom files into the correct locations
 COPY run.sh .
