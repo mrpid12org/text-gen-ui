@@ -1,4 +1,4 @@
-# Dockerfile - V6.2 (Final, Corrected Linker Path)
+# Dockerfile - V6.4 (Final, with Linker Path Fix via Symlink)
 # =================================================================================================
 # STAGE 1: The "Builder" - For building on GitHub Actions (no GPU)
 # =================================================================================================
@@ -50,9 +50,12 @@ RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.11 && \
 RUN $TEXTGEN_ENV_DIR/bin/pip install -r requirements/full/requirements_cuda128.txt
 RUN $TEXTGEN_ENV_DIR/bin/pip install -r extra-requirements.txt
 
-# Install llama-cpp-python, telling the linker where to find the full CUDA libraries.
+# --- THE FINAL FIX ---
+# Create a symbolic link to the CUDA stub library to satisfy the linker during the build process.
+RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/libcuda.so.1
+
+# Install llama-cpp-python, which will now link successfully.
 RUN CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=80;89;100" \
-    LDFLAGS="-L/usr/local/cuda/lib64" \
     $TEXTGEN_ENV_DIR/bin/pip install llama-cpp-python --no-cache-dir
 
 # =================================================================================================
