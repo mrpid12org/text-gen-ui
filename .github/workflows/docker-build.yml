@@ -1,10 +1,8 @@
-name: text-gen-ui
+name: Docker Image CI
 
 on:
-  # This section adds the manual trigger
   workflow_dispatch:
 
-  # These are your existing automatic triggers
   push:
     branches: [ "main" ]
   pull_request:
@@ -30,7 +28,7 @@ jobs:
         push: true
         tags: ${{ secrets.DOCKERHUB_USERNAME }}/text-gen-ui:latest
     - name: Cache Docker layers
-      uses: buildjet/cache@v4
+      uses: warpbuilds/cache@v1
       with:
         path: /tmp/.buildx-cache
         key: ${{ runner.os }}-buildx-${{ github.sha }}
