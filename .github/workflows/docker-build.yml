@@ -1,6 +1,10 @@
-name: Docker Image CI
+name: text-gen-ui
 
 on:
+  # This section adds the manual trigger
+  workflow_dispatch:
+
+  # These are your existing automatic triggers
   push:
     branches: [ "main" ]
   pull_request:
