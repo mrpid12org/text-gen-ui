@@ -1,4 +1,4 @@
-# Dockerfile - V6.4 (Final, with Linker Path Fix via Symlink)
+# Dockerfile - V6.4 (Final, with Werkzeug Hotfix)
 # =================================================================================================
 # STAGE 1: The "Builder" - For building on GitHub Actions (no GPU)
 # =================================================================================================
@@ -50,8 +50,12 @@ RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.11 && \
 RUN $TEXTGEN_ENV_DIR/bin/pip install -r requirements/full/requirements_cuda128.txt
 RUN $TEXTGEN_ENV_DIR/bin/pip install -r extra-requirements.txt
 
-# --- THE FINAL FIX ---
-# Create a symbolic link to the CUDA stub library to satisfy the linker during the build process.
+# --- THE WERKZEUG HOTFIX ---
+# The requirements file installs conflicting versions of Werkzeug.
+# Reinstalling a compatible version (2.3.x) at the end fixes the dependency issue.
+RUN $TEXTGEN_ENV_DIR/bin/pip install --force-reinstall Werkzeug==2.3.8
+
+# Create a symbolic link to the CUDA stub library to satisfy the linker.
 RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/libcuda.so.1
 
 # Install llama-cpp-python, which will now link successfully.
