@@ -1,16 +1,15 @@
 name: Docker Image CI
-
 on:
   workflow_dispatch:
-
   push:
-    branches: [ "main" ]
+    branches:
+    - main
   pull_request:
-    branches: [ "main" ]
-
+    branches:
+    - main
 jobs:
   build:
-    runs-on: warp-8-ubuntu-latest
+    runs-on: buildjet-8vcpu-ubuntu-2204
     steps:
     - uses: actions/checkout@v3
     - name: Set up Docker Buildx
@@ -20,6 +19,13 @@ jobs:
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Cache Docker layers
+      uses: actions/cache@v4
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
     - name: Build and push
       uses: docker/build-push-action@v4
       with:
@@ -27,10 +33,11 @@ jobs:
         file: ./Dockerfile
         push: true
         tags: ${{ secrets.DOCKERHUB_USERNAME }}/text-gen-ui:latest
-    - name: Cache Docker layers
-      uses: warpbuilds/cache@v1
-      with:
-        path: /tmp/.buildx-cache
-        key: ${{ runner.os }}-buildx-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-buildx-
+        cache-from: type=local,src=/tmp/.buildx-cache
+        cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+    # This step is required to move the new cache to the location that actions/cache can save.
+    - name: Move cache
+      run: |
+        rm -rf /tmp/.buildx-cache
+        mv /tmp/.buildx-cache-new /tmp/.buildx-cache
