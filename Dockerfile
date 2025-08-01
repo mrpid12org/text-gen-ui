@@ -1,4 +1,4 @@
-# Dockerfile - V6.5 (Development Version)
+# Dockerfile - V6.6 (Development Version with iproute2 fix)
 # This version prioritizes granular caching for faster debugging.
 # RUN commands are kept separate to leverage Docker's layer caching during development.
 
@@ -94,9 +94,10 @@ ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 # --- Runtime Dependencies ---
 # Install only the essential shared libraries required for the application to run.
+# iproute2 is added to provide the 'ss' command for the idle timeout script.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 libsm6 libxrender1 libxext6 libgl1-mesa-glx \
-    libopenblas-dev libgomp1 \
+    libopenblas-dev libgomp1 iproute2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory.
