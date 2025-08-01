@@ -1,0 +1,18 @@
+# Ignore the entire git directory
+.git/
+.github/
+
+# Ignore Python virtual environments
+.venv/
+venv/
+*.pyc
+*.pyo
+__pycache__/
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore build artifacts
+/tmp/.buildx-cache
+/tmp/.buildx-cache-new
