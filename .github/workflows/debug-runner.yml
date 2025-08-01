@@ -1,0 +1,11 @@
+name: Debug Runner CI
+
+on:
+  workflow_dispatch: # Allows you to trigger it manually
+
+jobs:
+  test-runner:
+    runs-on: buildjet-8vcpu-ubuntu-2204 # Using the exact same runner label
+    steps:
+      - name: Report for duty
+        run: echo "Hello from the Buildjet runner!"
