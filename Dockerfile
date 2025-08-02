@@ -1,8 +1,8 @@
-# Dockerfile - V7.0 (Production Optimized)
-# This version combines RUN commands to reduce image layers and size.
+# Dockerfile - V7.1 (Production Optimized with Pillow fix)
+# This version combines RUN commands and adds the Pillow library for image processing.
 
 # =================================================================================================
-# STAGE 1: The "Builder" - For compiling the application on a build server (e.g., GitHub Actions)
+# STAGE 1: The "Builder" - For compiling the application on a build server
 # =================================================================================================
 FROM nvidia/cuda:12.8.0-devel-ubuntu22.04 AS builder
 
@@ -14,7 +14,6 @@ ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_
 ENV PATH=$CONDA_DIR/bin:/usr/local/cuda/bin:$PATH
 
 # --- Install System & Python Dependencies ---
-# Combine installations into single RUN commands to reduce layers.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget git curl vim unzip build-essential \
     python3 python3-pip \
@@ -40,11 +39,13 @@ COPY extra-requirements.txt .
 COPY deep_reason ./extensions/deep_reason
 
 # --- Create Environment and Install Python Packages ---
+# Pillow is added here to enable the multimodal extension to process images.
 RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.11 && \
     conda install -y -p $TEXTGEN_ENV_DIR pip && \
     $TEXTGEN_ENV_DIR/bin/pip install --upgrade pip && \
     $TEXTGEN_ENV_DIR/bin/pip install -r requirements/full/requirements_cuda128.txt && \
     $TEXTGEN_ENV_DIR/bin/pip install -r extra-requirements.txt && \
+    $TEXTGEN_ENV_DIR/bin/pip install Pillow && \
     $TEXTGEN_ENV_DIR/bin/pip install --force-reinstall Werkzeug==2.3.8
 
 # --- CUDA-Specific Compilation ---
@@ -54,7 +55,7 @@ RUN CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=80;89;100" \
     $TEXTGEN_ENV_DIR/bin/pip install llama-cpp-python --no-cache-dir
 
 # =================================================================================================
-# STAGE 2: The "Final" Image - For running the application on a GPU host (e.g., RunPod)
+# STAGE 2: The "Final" Image - For running on a GPU host
 # =================================================================================================
 FROM nvidia/cuda:12.8.0-base-ubuntu22.04
 
