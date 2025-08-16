@@ -1,5 +1,5 @@
 #!/bin/bash
-# TGW RUN.SH - V3.0 with GPU-based Idle Shutdown for RunPod
+# TGW RUN.SH - V4.0 with Persistent Storage & GPU Idle Shutdown
 
 echo "----- Starting final run.sh at $(date) -----"
 
@@ -8,15 +8,12 @@ source /opt/conda/etc/profile.d/conda.sh
 conda activate /opt/conda/envs/textgen
 
 # --- 2. GPU Idle Check Functionality for RunPod ---
-# Default to 20 minutes (1200s) if not set.
+# (This section is unchanged)
 IDLE_TIMEOUT_SECONDS=${IDLE_TIMEOUT_SECONDS:-1200}
-# Check every 60 seconds. A longer interval makes it less likely to shut down during brief lulls.
 CHECK_INTERVAL=60
-# GPU utilization must be above this threshold to be considered "active".
 GPU_UTILIZATION_THRESHOLD=10
 
 function gpu_idle_check() {
-    # Sanity checks for RunPod environment
     if [ -z "$RUNPOD_POD_ID" ]; then
         echo "--- WARNING: RUNPOD_POD_ID not found. Disabling automatic shutdown. ---"
         return
@@ -36,48 +33,56 @@ function gpu_idle_check() {
     LAST_ACTIVE_TIME=$(date +%s)
     while true; do
         sleep $CHECK_INTERVAL
-
-        # Get the highest GPU utilization across all cards.
         CURRENT_UTILIZATION=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | sort -nr | head -n1 | sed 's/[^0-9]*//g')
-
         if [[ "$CURRENT_UTILIZATION" -gt "$GPU_UTILIZATION_THRESHOLD" ]]; then
-            # If active, just reset the timer and log it.
             LAST_ACTIVE_TIME=$(date +%s)
         else
-            # If idle, check how long it's been.
             CURRENT_TIME=$(date +%s)
             IDLE_DURATION=$((CURRENT_TIME - LAST_ACTIVE_TIME))
-
             if [ "$IDLE_DURATION" -ge "$IDLE_TIMEOUT_SECONDS" ]; then
                 echo "--- SHUTDOWN: GPU has been idle for $IDLE_DURATION seconds. Terminating pod. ---"
-                # Use runpodctl to terminate the pod
                 runpodctl remove pod $RUNPOD_POD_ID
-                # Exit the script after sending the command
                 exit 0
             fi
         fi
     done
 }
 
-# Run the idle checker in the background
 gpu_idle_check &
 
-# --- 3. Build Argument Array ---
+# --- 3. Setup Persistent Storage Directories ---
+PERSISTENT_DATA_DIR="/workspace/webui-data"
+echo "--- Ensuring persistent data directories exist at $PERSISTENT_DATA_DIR ---"
+mkdir -p "$PERSISTENT_DATA_DIR/characters"
+mkdir -p "$PERSISTENT_DATA_DIR/instruction-templates"
+mkdir -p "$PERSISTENT_DATA_DIR/presets"
+mkdir -p "$PERSISTENT_DATA_DIR/loras"
+mkdir -p "$PERSISTENT_DATA_DIR/logs"
+mkdir -p "$PERSISTENT_DATA_DIR/prompts"
+
+# --- 4. Build Argument Array ---
 CMD_ARGS_ARRAY=()
 
 # --- Model Selection & Loader ---
 if [ -n "$MODEL_NAME" ]; then
     CMD_ARGS_ARRAY+=(--model "$MODEL_NAME")
-    CMD_ARGS_ARRAY+=(--model-dir /workspace/models)
+    CMD_ARGS_ARRAY+=(--model-dir /workspace/models) # Models are in their own persistent volume
     CMD_ARGS_ARRAY+=(--loader llama.cpp)
 else
     echo "ERROR: No MODEL_NAME environment variable set. Cannot start."
     exit 1
 fi
 
+# --- NEW: Add Flags for Persistent Storage ---
+CMD_ARGS_ARRAY+=(--character-dir "$PERSISTENT_DATA_DIR/characters")
+CMD_ARGS_ARRAY+=(--instruction-template-dir "$PERSISTENT_DATA_DIR/instruction-templates")
+CMD_ARGS_ARRAY+=(--presets-dir "$PERSISTENT_DATA_DIR/presets")
+CMD_ARGS_ARRAY+=(--lora-dir "$PERSISTENT_DATA_DIR/loras")
+CMD_ARGS_ARRAY+=(--logs-dir "$PERSISTENT_DATA_DIR/logs")
+CMD_ARGS_ARRAY+=(--prompt-dir "$PERSISTENT_DATA_DIR/prompts")
+
 # --- Extensions ---
 BASE_EXTENSIONS="deep_reason,api"
-# Make the check for ENABLE_MULTIMODAL case-insensitive by converting to lowercase
 if [ "${ENABLE_MULTIMODAL,,}" == "true" ]; then
     FINAL_EXTENSIONS="$BASE_EXTENSIONS,multimodal"
 else
@@ -98,6 +103,6 @@ CMD_ARGS_ARRAY+=(--listen-port 7860)
 echo "Conda env activated. Running python server.py with args: ${CMD_ARGS_ARRAY[@]}"
 echo "---------------------------------"
 
-# --- 4. Launch Server Directly ---
+# --- 5. Launch Server Directly ---
 cd /app
 python server.py "${CMD_ARGS_ARRAY[@]}"
