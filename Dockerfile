@@ -15,7 +15,7 @@ ENV PATH=$CONDA_DIR/bin:/usr/local/cuda/bin:$PATH
 
 # --- Install System & Python Dependencies ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget git curl vim unzip build-essential \
+    wget git curl vim unzip build-essential rsync \
     python3 python3-pip \
     ca-certificates sudo software-properties-common \
     libglib2.0-0 libsm6 libxrender1 libxext6 libgl1-mesa-glx \
@@ -71,7 +71,7 @@ ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 # --- Install Runtime Dependencies ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 libsm6 libxrender1 libxext6 libgl1-mesa-glx \
-    libopenblas-dev libgomp1 iproute2 \
+    libopenblas-dev libgomp1 iproute2 rsync \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -86,34 +86,3 @@ RUN chmod +x /app/run.sh
 
 EXPOSE 7860
 ENTRYPOINT ["/app/run.sh"]
-```
-
-#### Step 2: Rebuild Your Docker Container
-
-Now, in your terminal, navigate to the directory that contains your `Dockerfile` and the other build files. Then run the following command.
-
-```bash
-docker build -t text-gen-ui-updated .
-```
-* `docker build`: The command to build an image.
-* `-t text-gen-ui-updated`: This "tags" or names your new image so you can easily identify it.
-* `.`: This tells Docker to look for the `Dockerfile` in the current directory.
-
-This process will take a while as it has to re-download the repository and reinstall all the Python packages.
-
-#### Step 3: Run Your New Container
-
-Once the build is complete, you will need to stop your old container and start the new, updated one. You will need to map your `/workspace/models` directory into the new container so it can see your downloaded models.
-
-```bash
-# First, find and stop your old running container
-docker ps
-# (Find the container ID or name from the list)
-docker stop [YOUR_OLD_CONTAINER_ID_OR_NAME]
-
-# Now, run the new, updated container
-docker run -d --gpus all -p 7860:7860 -v /workspace/models:/workspace/models --name text-gen-ui text-gen-ui-updated
-```
-* `-v /workspace/models:/workspace/models`: This is the crucial part that links your existing models folder on the host to the `/workspace/models` folder inside the new container.
-
-After this, you should be able to access the web UI, and the `gpt-oss-120b` model will load successful
