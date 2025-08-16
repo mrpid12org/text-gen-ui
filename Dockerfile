@@ -1,6 +1,5 @@
-# Dockerfile - V7.1 (Production Optimized - Corrected)
-# This version combines RUN commands for efficiency. Pillow is confirmed
-# to be installed as part of the main requirements file.
+# Dockerfile - V7.2 (Production Optimized - With Update Step)
+# This version adds a git pull to ensure the latest version of the webui is always used during a build.
 
 # =================================================================================================
 # STAGE 1: The "Builder" - For compiling the application on a build server
@@ -34,7 +33,10 @@ RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -
 WORKDIR /app
 
 # --- Application Code & Setup ---
-RUN git clone https://github.com/oobabooga/text-generation-webui.git .
+# UPDATED: Now pulls the latest changes to get new model support
+RUN git clone https://github.com/oobabooga/text-generation-webui.git . && \
+    git pull
+
 COPY run.sh .
 COPY extra-requirements.txt .
 COPY deep_reason ./extensions/deep_reason
@@ -50,8 +52,9 @@ RUN conda create -y -p $TEXTGEN_ENV_DIR python=3.11 && \
 # --- CUDA-Specific Compilation ---
 RUN ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/libcuda.so.1
 
+# Re-compiling llama-cpp-python to get the latest version
 RUN CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=80;89;100" \
-    $TEXTGEN_ENV_DIR/bin/pip install llama-cpp-python --no-cache-dir
+    $TEXTGEN_ENV_DIR/bin/pip install llama-cpp-python --no-cache-dir --force-reinstall --upgrade
 
 # =================================================================================================
 # STAGE 2: The "Final" Image - For running on a GPU host
@@ -83,3 +86,34 @@ RUN chmod +x /app/run.sh
 
 EXPOSE 7860
 ENTRYPOINT ["/app/run.sh"]
+```
+
+#### Step 2: Rebuild Your Docker Container
+
+Now, in your terminal, navigate to the directory that contains your `Dockerfile` and the other build files. Then run the following command.
+
+```bash
+docker build -t text-gen-ui-updated .
+```
+* `docker build`: The command to build an image.
+* `-t text-gen-ui-updated`: This "tags" or names your new image so you can easily identify it.
+* `.`: This tells Docker to look for the `Dockerfile` in the current directory.
+
+This process will take a while as it has to re-download the repository and reinstall all the Python packages.
+
+#### Step 3: Run Your New Container
+
+Once the build is complete, you will need to stop your old container and start the new, updated one. You will need to map your `/workspace/models` directory into the new container so it can see your downloaded models.
+
+```bash
+# First, find and stop your old running container
+docker ps
+# (Find the container ID or name from the list)
+docker stop [YOUR_OLD_CONTAINER_ID_OR_NAME]
+
+# Now, run the new, updated container
+docker run -d --gpus all -p 7860:7860 -v /workspace/models:/workspace/models --name text-gen-ui text-gen-ui-updated
+```
+* `-v /workspace/models:/workspace/models`: This is the crucial part that links your existing models folder on the host to the `/workspace/models` folder inside the new container.
+
+After this, you should be able to access the web UI, and the `gpt-oss-120b` model will load successful
