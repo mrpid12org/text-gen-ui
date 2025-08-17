@@ -1,5 +1,5 @@
 #!/bin/bash
-# TGW RUN.SH - V5.0 with Symlink Persistence & GPU Idle Shutdown for RunPod
+# TGW RUN.SH - V9.1 with Symlink Persistence & GPU Idle Shutdown for RunPod
 
 echo "----- Starting final run.sh at $(date) -----"
 
@@ -7,49 +7,45 @@ echo "----- Starting final run.sh at $(date) -----"
 source /opt/conda/etc/profile.d/conda.sh
 conda activate /opt/conda/envs/textgen
 
-# --- 2. Setup Persistent Storage via Symlinks ---
+# --- 2. Setup Persistent Storage ---
 PERSISTENT_DATA_DIR="/workspace/webui-data"
-echo "--- Setting up persistent storage symlinks to $PERSISTENT_DATA_DIR ---"
+echo "--- Consolidating all data into $PERSISTENT_DATA_DIR ---"
 
-# List of directories inside /app to make persistent
-DIRECTORIES_TO_LINK=(
-    "characters"
-    "instruction-templates"
-    "presets"
-    "loras"
-    "logs"
-    "prompts"
-    "softprompts"
-    "training/datasets"
-    "training/formats"
-)
+# Explicitly create directories that are targeted by launch arguments
+mkdir -p "$PERSISTENT_DATA_DIR/models"
+mkdir -p "$PERSISTENT_DATA_DIR/loras"
 
-for dir in "${DIRECTORIES_TO_LINK[@]}"; do
-    APP_DIR="/app/$dir"
-    PERSISTENT_DIR="$PERSISTENT_DATA_DIR/$dir"
+# --- Symlink the User Data Directory ---
+# All user data (characters, presets, templates, etc.) is within 'user_data'.
+# We only need to link this single directory to persist everything.
+USER_DATA_APP_DIR="/app/user_data"
+USER_DATA_PERSISTENT_DIR="$PERSISTENT_DATA_DIR/user_data"
 
-    # Ensure the target persistent directory exists
-    mkdir -p "$PERSISTENT_DIR"
+echo "Processing symlink: $USER_DATA_APP_DIR -> $USER_DATA_PERSISTENT_DIR"
 
-    # If the original app directory exists and is NOT a symlink, move its contents
-    if [ -d "$APP_DIR" ] && [ ! -L "$APP_DIR" ]; then
-        echo "Moving initial contents of $APP_DIR to persistent storage..."
-        # Use rsync to safely move contents. Handles cases where directories are empty.
-        rsync -a --remove-source-files "$APP_DIR/" "$PERSISTENT_DIR/"
-        rm -rf "$APP_DIR"
-    fi
+# Ensure the target persistent directory exists
+mkdir -p "$USER_DATA_PERSISTENT_DIR"
 
-    # If the app directory doesn't exist (or we just removed it), create the symlink
-    if [ ! -e "$APP_DIR" ]; then
-        ln -s "$PERSISTENT_DIR" "$APP_DIR"
-        echo "Symlinked $APP_DIR -> $PERSISTENT_DIR"
-    fi
-done
+# If the original app directory exists and is NOT a symlink, move its contents
+if [ -d "$USER_DATA_APP_DIR" ] && [ ! -L "$USER_DATA_APP_DIR" ]; then
+    echo "Moving initial contents of $USER_DATA_APP_DIR to persistent storage..."
+    rsync -a --remove-source-files "$USER_DATA_APP_DIR/" "$USER_DATA_PERSISTENT_DIR/"
+    rm -rf "$USER_DATA_APP_DIR"
+fi
+
+# Ensure parent directory for the symlink exists in /app
+mkdir -p "$(dirname "$USER_DATA_APP_DIR")"
+
+# If the app directory doesn't exist (or we just removed it), create the symlink
+if [ ! -e "$USER_DATA_APP_DIR" ]; then
+    ln -s "$USER_DATA_PERSISTENT_DIR" "$USER_DATA_APP_DIR"
+    echo "Symlinked $USER_DATA_APP_DIR -> $USER_DATA_PERSISTENT_DIR"
+fi
 echo "--- Persistence setup complete ---"
 
 
 # --- 3. GPU Idle Check Functionality for RunPod ---
-# (This section is unchanged)
+# (This section is unchanged from the original file)
 IDLE_TIMEOUT_SECONDS=${IDLE_TIMEOUT_SECONDS:-1200}
 CHECK_INTERVAL=60
 GPU_UTILIZATION_THRESHOLD=10
@@ -81,16 +77,24 @@ gpu_idle_check &
 
 # --- 4. Build Argument Array ---
 CMD_ARGS_ARRAY=()
+MODELS_DIR="$PERSISTENT_DATA_DIR/models"
+LORAS_DIR="$PERSISTENT_DATA_DIR/loras"
 
-# --- Model Selection & Loader ---
+# --- Model & LoRA Configuration ---
+# Use explicit arguments to point the application directly to persistent storage
+CMD_ARGS_ARRAY+=(--model-dir "$MODELS_DIR")
+CMD_ARGS_ARRAY+=(--lora-dir "$LORAS_DIR")
+
 if [ -n "$MODEL_NAME" ]; then
     CMD_ARGS_ARRAY+=(--model "$MODEL_NAME")
-    CMD_ARGS_ARRAY+=(--model-dir /workspace/models)
-    CMD_ARGS_ARRAY+=(--loader llama.cpp)
-else
-    echo "ERROR: No MODEL_NAME environment variable set. Cannot start."
-    exit 1
 fi
+
+# You can now also specify LoRAs to load at startup via a RunPod environment variable
+if [ -n "$LORA_NAMES" ]; then
+    CMD_ARGS_ARRAY+=(--lora $LORA_NAMES)
+fi
+
+CMD_ARGS_ARRAY+=(--loader llama.cpp)
 
 # --- Extensions ---
 BASE_EXTENSIONS="deep_reason,api"
