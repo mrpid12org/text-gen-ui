@@ -1,5 +1,5 @@
 #!/bin/bash
-# TGW RUN.SH - V9.1 with Symlink Persistence & GPU Idle Shutdown for RunPod
+# TGW RUN.SH - V12.0 with Symlink Persistence & GPU Idle Shutdown for RunPod
 
 echo "----- Starting final run.sh at $(date) -----"
 
@@ -11,13 +11,8 @@ conda activate /opt/conda/envs/textgen
 PERSISTENT_DATA_DIR="/workspace/webui-data"
 echo "--- Consolidating all data into $PERSISTENT_DATA_DIR ---"
 
-# Explicitly create directories that are targeted by launch arguments
-mkdir -p "$PERSISTENT_DATA_DIR/models"
-mkdir -p "$PERSISTENT_DATA_DIR/loras"
-
 # --- Symlink the User Data Directory ---
-# All user data (characters, presets, templates, etc.) is within 'user_data'.
-# We only need to link this single directory to persist everything.
+# All user data (characters, presets, models, loras, etc.) is within 'user_data'.
 USER_DATA_APP_DIR="/app/user_data"
 USER_DATA_PERSISTENT_DIR="$PERSISTENT_DATA_DIR/user_data"
 
@@ -36,11 +31,16 @@ fi
 # Ensure parent directory for the symlink exists in /app
 mkdir -p "$(dirname "$USER_DATA_APP_DIR")"
 
-# If the app directory doesn't exist (or we just removed it), create the symlink
+# If the symlink doesn't exist, create it.
 if [ ! -e "$USER_DATA_APP_DIR" ]; then
     ln -s "$USER_DATA_PERSISTENT_DIR" "$USER_DATA_APP_DIR"
     echo "Symlinked $USER_DATA_APP_DIR -> $USER_DATA_PERSISTENT_DIR"
 fi
+
+# Explicitly create the models and loras directories inside the persistent user_data folder
+mkdir -p "$USER_DATA_PERSISTENT_DIR/models"
+mkdir -p "$USER_DATA_PERSISTENT_DIR/loras"
+
 echo "--- Persistence setup complete ---"
 
 
@@ -77,8 +77,9 @@ gpu_idle_check &
 
 # --- 4. Build Argument Array ---
 CMD_ARGS_ARRAY=()
-MODELS_DIR="$PERSISTENT_DATA_DIR/models"
-LORAS_DIR="$PERSISTENT_DATA_DIR/loras"
+# Point to the models and loras directories inside the persistent user_data folder
+MODELS_DIR="$PERSISTENT_DATA_DIR/user_data/models"
+LORAS_DIR="$PERSISTENT_DATA_DIR/user_data/loras"
 
 # --- Model & LoRA Configuration ---
 # Use explicit arguments to point the application directly to persistent storage
