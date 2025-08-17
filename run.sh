@@ -1,5 +1,5 @@
 #!/bin/bash
-# TGW RUN.SH - V12.0 with Symlink Persistence & GPU Idle Shutdown for RunPod
+# TGW RUN.SH - V13.0 with Symlink Persistence & GPU Idle Shutdown for RunPod
 
 echo "----- Starting final run.sh at $(date) -----"
 
@@ -76,6 +76,9 @@ function gpu_idle_check() {
 gpu_idle_check &
 
 # --- 4. Build Argument Array ---
+# Set Gradio's temp directory to be inside the container to avoid symlink issues
+export GRADIO_TEMP_DIR=/tmp/gradio
+
 CMD_ARGS_ARRAY=()
 # Point to the models and loras directories inside the persistent user_data folder
 MODELS_DIR="$PERSISTENT_DATA_DIR/user_data/models"
