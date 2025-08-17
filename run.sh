@@ -1,5 +1,5 @@
 #!/bin/bash
-# TGW RUN.SH - V13.0 with Symlink Persistence & GPU Idle Shutdown for RunPod
+# TGW RUN.SH - V14.0 with Symlink Persistence & GPU Idle Shutdown for RunPod
 
 echo "----- Starting final run.sh at $(date) -----"
 
@@ -12,32 +12,24 @@ PERSISTENT_DATA_DIR="/workspace/webui-data"
 echo "--- Consolidating all data into $PERSISTENT_DATA_DIR ---"
 
 # --- Symlink the User Data Directory ---
-# All user data (characters, presets, models, loras, etc.) is within 'user_data'.
 USER_DATA_APP_DIR="/app/user_data"
 USER_DATA_PERSISTENT_DIR="$PERSISTENT_DATA_DIR/user_data"
 
 echo "Processing symlink: $USER_DATA_APP_DIR -> $USER_DATA_PERSISTENT_DIR"
-
-# Ensure the target persistent directory exists
 mkdir -p "$USER_DATA_PERSISTENT_DIR"
 
-# If the original app directory exists and is NOT a symlink, move its contents
 if [ -d "$USER_DATA_APP_DIR" ] && [ ! -L "$USER_DATA_APP_DIR" ]; then
     echo "Moving initial contents of $USER_DATA_APP_DIR to persistent storage..."
     rsync -a --remove-source-files "$USER_DATA_APP_DIR/" "$USER_DATA_PERSISTENT_DIR/"
     rm -rf "$USER_DATA_APP_DIR"
 fi
 
-# Ensure parent directory for the symlink exists in /app
-mkdir -p "$(dirname "$USER_DATA_APP_DIR")"
-
-# If the symlink doesn't exist, create it.
 if [ ! -e "$USER_DATA_APP_DIR" ]; then
+    mkdir -p "$(dirname "$USER_DATA_APP_DIR")"
     ln -s "$USER_DATA_PERSISTENT_DIR" "$USER_DATA_APP_DIR"
     echo "Symlinked $USER_DATA_APP_DIR -> $USER_DATA_PERSISTENT_DIR"
 fi
 
-# Explicitly create the models and loras directories inside the persistent user_data folder
 mkdir -p "$USER_DATA_PERSISTENT_DIR/models"
 mkdir -p "$USER_DATA_PERSISTENT_DIR/loras"
 
@@ -45,7 +37,7 @@ echo "--- Persistence setup complete ---"
 
 
 # --- 3. GPU Idle Check Functionality for RunPod ---
-# (This section is unchanged from the original file)
+# (This section is unchanged)
 IDLE_TIMEOUT_SECONDS=${IDLE_TIMEOUT_SECONDS:-1200}
 CHECK_INTERVAL=60
 GPU_UTILIZATION_THRESHOLD=10
@@ -76,24 +68,21 @@ function gpu_idle_check() {
 gpu_idle_check &
 
 # --- 4. Build Argument Array ---
-# Set Gradio's temp directory to be inside the container to avoid symlink issues
 export GRADIO_TEMP_DIR=/tmp/gradio
 
 CMD_ARGS_ARRAY=()
-# Point to the models and loras directories inside the persistent user_data folder
 MODELS_DIR="$PERSISTENT_DATA_DIR/user_data/models"
 LORAS_DIR="$PERSISTENT_DATA_DIR/user_data/loras"
 
 # --- Model & LoRA Configuration ---
-# Use explicit arguments to point the application directly to persistent storage
-CMD_ARGS_ARRAY+=(--model-dir "$MODELS_DIR")
-CMD_ARGS_ARRAY+=(--lora-dir "$LORAS_DIR")
-
+# UPDATED: Provide the full, unambiguous path to the model file
 if [ -n "$MODEL_NAME" ]; then
-    CMD_ARGS_ARRAY+=(--model "$MODEL_NAME")
+    CMD_ARGS_ARRAY+=(--model "$MODELS_DIR/$MODEL_NAME")
 fi
 
-# You can now also specify LoRAs to load at startup via a RunPod environment variable
+CMD_ARGS_ARRAY+=(--lora-dir "$LORAS_DIR")
+
+# You can now also specify LoRAs to load at startup
 if [ -n "$LORA_NAMES" ]; then
     CMD_ARGS_ARRAY+=(--lora $LORA_NAMES)
 fi
